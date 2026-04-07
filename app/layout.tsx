@@ -1,38 +1,55 @@
-import type { Metadata } from "next";
+'use client'; // Convertimos el layout en client component para manejar la sesión
+
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import Navbar from "../components/Navbar";
 import { Providers } from "../components/Providers";
 import { ThemeProvider } from "../components/ThemeProvider";
 import { Toaster } from 'sonner';
+import { useEffect } from 'react';
+import { supabase } from '../lib/supabase';
+import { useRouter } from 'next/navigation';
 
 const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
 const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"] });
 
-// Un toque más comercial al título y descripción
-export const metadata: Metadata = {
-  title: "VeciStore | Tienda Creativa",
-  description: "Descubre amigurumis, impresión 3D y creaciones únicas hechas a medida.",
-};
-
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
+  const router = useRouter();
+
+  useEffect(() => {
+    // Escuchar cambios en la sesión (Login, Logout, Refresh)
+    const { data: { subscription } } = supabase.auth.onAuthStateChanged((event, session) => {
+      console.log("Evento de Auth:", event);
+      
+      if (event === 'SIGNED_OUT') {
+        // Limpiar datos locales si se cierra sesión
+        localStorage.removeItem('veci_notifications');
+        router.refresh(); // Refrescar para limpiar estados de servidor
+      }
+      
+      if (event === 'INITIAL_SESSION' || event === 'SIGNED_IN') {
+        // La sesión se recuperó con éxito
+        console.log("Sesión activa para:", session?.user.email);
+      }
+    });
+
+    return () => subscription.unsubscribe();
+  }, [router]);
+
   return (
     <html lang="es" suppressHydrationWarning>
-      {/* Añadimos min-h-screen y flex flex-col para estructurar la página perfecta */}
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased bg-[#FAFAFA] dark:bg-[#0A0A0A] text-zinc-900 dark:text-zinc-100 transition-colors duration-500 selection:bg-indigo-500 selection:text-white min-h-screen flex flex-col`}>
         <ThemeProvider>
           <Providers>
-            {/* Le decimos al Toaster que respete el modo oscuro del sistema */}
+            {/* Toaster posicionado para ser visible en móvil también */}
             <Toaster position="top-center" richColors theme="system" /> 
             
             <Navbar />
             
-            {/* flex-grow hace que esto empuje al footer siempre hacia abajo */}
             <main className="flex-grow w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12 flex flex-col">
               {children}
             </main>
 
-            {/* FOOTER MINIMALISTA */}
             <footer className="border-t border-zinc-200 dark:border-zinc-800/60 bg-white/50 dark:bg-[#0A0A0A]/50 backdrop-blur-md mt-auto transition-colors duration-500">
               <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 flex flex-col sm:flex-row justify-between items-center gap-4">
                 <p className="text-zinc-500 dark:text-zinc-400 text-sm font-medium">
@@ -44,7 +61,6 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
                 </div>
               </div>
             </footer>
-
           </Providers>
         </ThemeProvider>
       </body>

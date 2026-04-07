@@ -52,11 +52,26 @@ export default function NotificationBell() {
     setupRealtime();
   }, []);
 
-  const addNotification = (text: string) => {
-    setNotifications(prev => [{ text, time: new Date().toLocaleTimeString() }, ...prev]);
+    const addNotification = (text: string) => {
+    const newNotif = { 
+        text, 
+        time: new Date().toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' }),
+        id: Date.now() 
+    };
+
+    // IMPORTANTE: Usar el callback (prev) para no perder las anteriores
+    setNotifications((prev) => {
+        const updated = [newNotif, ...prev].slice(0, 10);
+        localStorage.setItem('veci_notifications', JSON.stringify(updated));
+        return updated;
+    });
+
     setUnread(true);
-    new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3').play().catch(() => {});
-  };
+    
+    // Sonido con un link directo para asegurar que cargue
+    const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
+    audio.play().catch(() => {});
+    };
 
   return (
     <div className="relative">
