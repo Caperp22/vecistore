@@ -15,7 +15,6 @@ export default function NotificationBell() {
   const channelRef = useRef<any>(null);
 
   useEffect(() => {
-    // 1. Cargar historial
     const saved = localStorage.getItem('veci_notifications');
     if (saved) {
       const parsed = JSON.parse(saved);
@@ -30,12 +29,10 @@ export default function NotificationBell() {
       const myId = session.user.id;
       const isAdmin = session.user.email === 'caperp22@gmail.com';
 
-      // 2. Limpiar conexiones viejas
       if (channelRef.current) {
         await supabase.removeChannel(channelRef.current);
       }
 
-      // 3. Crear canal único
       const newChannel = supabase.channel(`notifs-${myId}-${Date.now()}`);
       channelRef.current = newChannel;
 
@@ -60,7 +57,7 @@ export default function NotificationBell() {
           })
           .subscribe((status) => {
             if (status === 'CLOSED' || status === 'CHANNEL_ERROR') {
-              setTimeout(setupRealtime, 2000); // Autoreconexión
+              setTimeout(setupRealtime, 2000); 
             }
           });
       }
@@ -146,7 +143,6 @@ export default function NotificationBell() {
       </button>
 
       {isOpen && (
-        {/* 🔥 SOLUCIÓN DEFINITIVA: Tamaño fijo conservador (w-72), anclado a la derecha sin desbordar */}
         <div className="absolute right-0 sm:-right-4 mt-4 w-72 sm:w-80 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl shadow-2xl z-50 overflow-hidden origin-top-right transition-all">
           
           <div className="p-4 border-b border-zinc-100 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-800/50 flex justify-between items-center">
