@@ -30,10 +30,10 @@ export default function Navbar() {
           {/* Logo Minimalista */}
           <Link href="/" className="text-xl font-black tracking-tighter text-zinc-900 dark:text-white flex items-center gap-2">
             <span className="bg-indigo-600 text-white w-8 h-8 flex items-center justify-center rounded-lg text-sm">V</span>
-            VeciStore.
+            <span className="hidden xs:block">VeciStore.</span>
           </Link>
 
-          {/* MENÚ DE ESCRITORIO */}
+          {/* MENÚ DE ESCRITORIO (Se mantiene igual) */}
           <div className="hidden md:flex space-x-8 items-center">
             {categories.map((cat) => (
               <Link 
@@ -46,12 +46,10 @@ export default function Navbar() {
             ))}
             
             <div className="pl-6 border-l border-zinc-200 dark:border-zinc-800 flex items-center gap-5">
-              {/* Botón Dark Mode Premium */}
               {mounted && (
                 <button 
                   onClick={() => setTheme(resolvedTheme === 'dark' ? 'light' : 'dark')}
                   className="text-zinc-400 hover:text-zinc-900 dark:hover:text-white transition-colors"
-                  title="Alternar Tema"
                 >
                   {resolvedTheme === 'dark' ? (
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" /></svg>
@@ -65,12 +63,29 @@ export default function Navbar() {
             </div>
           </div>
 
-          {/* BOTONES MÓVILES */}
-          <div className="md:hidden flex items-center gap-4">
+          {/* ACCIONES MÓVILES (NUEVA DISTRIBUCIÓN) */}
+          <div className="md:hidden flex items-center gap-2">
+            {/* Botón Dark Mode Móvil */}
+            {mounted && (
+              <button 
+                onClick={() => setTheme(resolvedTheme === 'dark' ? 'light' : 'dark')}
+                className="p-2 text-zinc-500 dark:text-zinc-400"
+              >
+                {resolvedTheme === 'dark' ? (
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" /></svg>
+                ) : (
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" /></svg>
+                )}
+              </button>
+            )}
+            
+            <UserMenu />
             <CartWidget />
+            
+            {/* Botón de Menú (Solo para Categorías) */}
             <button 
               onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-              className="text-zinc-500 hover:text-zinc-900 dark:hover:text-white transition-colors"
+              className="ml-1 p-2 text-zinc-500 hover:text-zinc-900 dark:hover:text-white transition-colors"
             >
               <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 {isMobileMenuOpen ? (
@@ -84,32 +99,21 @@ export default function Navbar() {
         </div>
       </div>
 
-      {/* MENÚ MÓVIL ESTILO MINIMAL */}
+      {/* MENÚ MÓVIL (SOLO CATEGORÍAS) */}
       {isMobileMenuOpen && (
-        <div className="md:hidden bg-white/95 dark:bg-[#0A0A0A]/95 backdrop-blur-xl border-t border-zinc-200 dark:border-zinc-800 absolute w-full shadow-2xl">
-          <div className="px-6 pt-4 pb-8 space-y-2 flex flex-col">
+        <div className="md:hidden bg-white/95 dark:bg-[#0A0A0A]/95 backdrop-blur-xl border-t border-zinc-200 dark:border-zinc-800 absolute w-full shadow-2xl animate-in fade-in slide-in-from-top-2">
+          <div className="px-6 py-8 space-y-2">
+            <p className="text-[10px] font-black text-zinc-400 uppercase tracking-widest mb-4">Categorías</p>
             {categories.map((cat) => (
               <Link 
                 key={cat.id} 
                 href={`/categoria/${cat.slug}`} 
                 onClick={() => setIsMobileMenuOpen(false)}
-                className="block py-3 text-lg font-medium text-zinc-600 dark:text-zinc-300 hover:text-indigo-600 dark:hover:text-indigo-400"
+                className="block py-3 text-xl font-bold text-zinc-800 dark:text-zinc-200 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors"
               >
                 {cat.name}
               </Link>
             ))}
-            
-            <div className="border-t border-zinc-200 dark:border-zinc-800 mt-4 pt-6 flex flex-col gap-4">
-              <UserMenu />
-              {mounted && (
-                <button 
-                  onClick={() => { setTheme(resolvedTheme === 'dark' ? 'light' : 'dark'); setIsMobileMenuOpen(false); }}
-                  className="flex items-center justify-center gap-2 w-full py-4 rounded-2xl border border-zinc-200 dark:border-zinc-800 text-zinc-800 dark:text-zinc-200 font-bold hover:bg-zinc-50 dark:hover:bg-zinc-900 transition-colors"
-                >
-                  {resolvedTheme === 'dark' ? '🌞 Cambiar a Claro' : '🌙 Cambiar a Oscuro'}
-                </button>
-              )}
-            </div>
           </div>
         </div>
       )}
