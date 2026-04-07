@@ -1,14 +1,17 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 import { toast } from 'sonner';
-import Link from 'next/link'; // 🔥 El superhéroe de la navegación nativa
+import Link from 'next/link'; 
 
 export default function NotificationBell() {
   const [notifications, setNotifications] = useState<any[]>([]);
   const [isOpen, setIsOpen] = useState(false);
   const [unread, setUnread] = useState(false);
+  
+  // Guardamos el canal en una referencia para poder matarlo y revivirlo sin errores
+  const channelRef = useRef<any>(null);
 
   useEffect(() => {
     const saved = localStorage.getItem('veci_notifications');
@@ -18,8 +21,6 @@ export default function NotificationBell() {
       if (parsed.length > 0) setUnread(true);
     }
 
-    let channel: any;
-
     const setupRealtime = async () => {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) return;
@@ -27,16 +28,28 @@ export default function NotificationBell() {
       const myId = session.user.id;
       const isAdmin = session.user.email === 'caperp22@gmail.com';
 
+      // 1. Matamos cualquier conexión "zombi" anterior antes de crear una nueva
+      if (channelRef.current) {
+        await supabase.removeChannel(channelRef.current);
+      }
+
+      // 2. CREAMOS UN CANAL ÚNICO usando la hora exacta. 
+      // Esto fuerza a Supabase y al celular a abrir una tubería 100% nueva.
+      const uniqueChannelName = isAdmin 
+        ? `admin-channel-${Date.now()}` 
+        : `client-${myId}-${Date.now()}`;
+
+      const newChannel = supabase.channel(uniqueChannelName);
+      channelRef.current = newChannel;
+
       if (isAdmin) {
-        channel = supabase
-          .channel('admin-channel')
+        newChannel
           .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'orders' }, () => {
              addNotification('🛒 ¡Nuevo pedido recibido!', '/admin/dashboard');
           })
           .subscribe();
       } else {
-        channel = supabase
-          .channel(`client-${myId}`)
+        newChannel
           .on('postgres_changes', { 
               event: 'UPDATE', 
               schema: 'public', 
@@ -47,22 +60,32 @@ export default function NotificationBell() {
               toast.success(`Tu pedido ahora está: ${nuevoEstado}`); 
               addNotification(`📦 Tu pedido cambió a: ${nuevoEstado}`, '/perfil');
           })
-          .subscribe();
+          .subscribe((status) => {
+            // 3. EL DESFIBRILADOR: Si la conexión se cae o da error, la reiniciamos sola en 2 segundos
+            if (status === 'CLOSED' || status === 'CHANNEL_ERROR') {
+              console.log("Conexión perdida por el celular. Reconectando...");
+              setTimeout(setupRealtime, 2000);
+            }
+          });
       }
     };
 
     setupRealtime();
 
+    // 4. Reconexión inteligente al desbloquear el celular
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible') {
-        if (channel) supabase.removeChannel(channel);
-        setupRealtime();
+        // Le damos 1 segundo al celular para que despierte su antena WiFi/4G antes de reconectar
+        setTimeout(() => {
+          setupRealtime();
+        }, 1000);
       }
     };
+    
     document.addEventListener('visibilitychange', handleVisibilityChange);
 
     return () => {
-      if (channel) supabase.removeChannel(channel);
+      if (channelRef.current) supabase.removeChannel(channelRef.current);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
   }, []);
@@ -90,13 +113,10 @@ export default function NotificationBell() {
     if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate([200, 100, 200]); 
   };
 
-  // --- AHORA SOLO BORRA LA NOTIFICACIÓN, EL <Link> SE ENCARGA DEL VIAJE ---
   const marcarComoLeida = (idQueVamosABorrar: number) => {
     const notificacionesRestantes = notifications.filter(notif => notif.id !== idQueVamosABorrar);
-    
     setNotifications(notificacionesRestantes);
     localStorage.setItem('veci_notifications', JSON.stringify(notificacionesRestantes));
-    
     if (notificacionesRestantes.length === 0) setUnread(false);
     setIsOpen(false);
   };
@@ -149,7 +169,6 @@ export default function NotificationBell() {
               </div>
             ) : (
               notifications.map((n) => (
-                // 🔥 AQUÍ ESTÁ EL TRUCO: Usamos Link para navegar y onClick solo para borrar
                 n.link ? (
                   <Link 
                     key={n.id}
