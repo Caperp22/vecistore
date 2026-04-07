@@ -59,17 +59,17 @@ export default function Navbar() {
                   )}
                 </button>
               )}
-              {/* En escritorio el orden normal: Campana, Usuario, Carrito */}
+              {/* En escritorio: Campana, Usuario, Carrito */}
               <NotificationBell />
               <UserMenu />
               <CartWidget />
             </div>
           </div>
 
-          {/* ACCIONES MÓVILES (NUEVA DISTRIBUCIÓN ESTRATÉGICA) */}
+          {/* ACCIONES MÓVILES (Campana movida a la izquierda) */}
           <div className="md:hidden flex items-center">
             
-            {/* GRUPO IZQUIERDO: Dark Mode + CAMPANITA (Lejos del borde derecho) */}
+            {/* GRUPO IZQUIERDO: Dark Mode + CAMPANITA */}
             <div className="flex items-center gap-1 mr-2 border-r border-zinc-200 dark:border-zinc-800 pr-2">
               {mounted && (
                 <button 
@@ -86,7 +86,7 @@ export default function Navbar() {
               <NotificationBell />
             </div>
 
-            {/* GRUPO DERECHO: Usuario + Carrito + Menú Hamburgesa */}
+            {/* GRUPO DERECHO: Usuario + Carrito + Menú */}
             <div className="flex items-center gap-1">
               <UserMenu />
               <CartWidget />
