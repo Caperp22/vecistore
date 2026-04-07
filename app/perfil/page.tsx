@@ -13,29 +13,43 @@ export default function PerfilPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!user) {
-      router.push('/login');
-      return;
-    }
+    const validarYTraerPedidos = async () => {
+      // 1. Le preguntamos DIRECTAMENTE a Supabase (evita el falso positivo al refrescar)
+      const { data: { session } } = await supabase.auth.getSession();
 
-    const fetchPedidos = async () => {
+      if (!session?.user) {
+        router.push('/login');
+        return;
+      }
+
+      // 2. Si hay sesión, procedemos a buscar los pedidos del usuario
       const { data, error } = await supabase
         .from('orders')
         .select('*')
-        .eq('user_id', user.id)
+        .eq('user_id', session.user.id)
         .order('created_at', { ascending: false });
 
       if (data) setPedidos(data);
+      
+      // 3. Apagamos la pantalla de carga
       setLoading(false);
     };
 
-    fetchPedidos();
-  }, [user, router]);
+    validarYTraerPedidos();
+  }, [router]);
 
-  if (loading) return <div className="py-32 text-center text-zinc-500 dark:text-zinc-400 font-bold text-xl animate-pulse">Cargando tu perfil...</div>;
+  // Pantalla de carga mejorada mientras Supabase verifica la sesión
+  if (loading) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[50vh] animate-in fade-in duration-500">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-indigo-600 mb-6"></div>
+        <p className="text-zinc-500 dark:text-zinc-400 font-bold text-xl animate-pulse">Cargando tu perfil...</p>
+      </div>
+    );
+  }
 
   return (
-    <div className="py-10 max-w-5xl mx-auto px-4">
+    <div className="py-10 max-w-5xl mx-auto px-4 animate-in fade-in duration-700">
       
       {/* Cabecera del Perfil */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end mb-10 border-b border-zinc-200 dark:border-zinc-800 pb-6 gap-6">
