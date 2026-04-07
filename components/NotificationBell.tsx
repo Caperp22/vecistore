@@ -1,17 +1,16 @@
 'use client';
 
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
-import { toast } from 'sonner'; // Agregamos el "Chismoso Visual"
+import { toast } from 'sonner';
 
 export default function NotificationBell() {
   const [notifications, setNotifications] = useState<any[]>([]);
   const [isOpen, setIsOpen] = useState(false);
   const [unread, setUnread] = useState(false);
-  
-  const userIdRef = useRef<string | null>(null);
 
   useEffect(() => {
+    // 1. Cargar notificaciones del historial
     const saved = localStorage.getItem('veci_notifications');
     if (saved) setNotifications(JSON.parse(saved));
 
@@ -21,54 +20,51 @@ export default function NotificationBell() {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) return;
       
-      userIdRef.current = session.user.id;
+      const myId = session.user.id;
       const isAdmin = session.user.email === 'caperp22@gmail.com';
 
-      channel = supabase
-        .channel('order-updates')
-        .on(
-          'postgres_changes',
-          { event: '*', schema: 'public', table: 'orders' },
-          (payload) => {
-            // EL CHISMOSO VISUAL PARA EL CELULAR
-            toast.info(`🔔 Señal: ${payload.eventType}`);
-
-            if (isAdmin && payload.eventType === 'INSERT') {
-              addNotification('🛒 ¡Nuevo pedido recibido!');
-            }
-            
-            if (!isAdmin && payload.eventType === 'UPDATE') {
-              // Mostramos en pantalla qué IDs está comparando
-              const orderId = payload.new.user_id;
-              const myId = userIdRef.current;
+      if (isAdmin) {
+        // --- CANAL DEL ADMIN ---
+        // Solo escucha cuando entra un pedido NUEVO (INSERT)
+        channel = supabase
+          .channel('admin-channel')
+          .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'orders' }, () => {
+             addNotification('🛒 ¡Nuevo pedido recibido!');
+          })
+          .subscribe();
+          
+      } else {
+        // --- CANAL DEL CLIENTE (EL ARREGLO ESTÁ AQUÍ) ---
+        // Usamos "filter" para que Supabase solo nos mande los cambios de ESTE usuario
+        channel = supabase
+          .channel(`client-${myId}`)
+          .on('postgres_changes', { 
+              event: 'UPDATE', 
+              schema: 'public', 
+              table: 'orders',
+              filter: `user_id=eq.${myId}` // 🔥 Filtro mágico de seguridad
+            }, (payload) => {
               
-              toast(`Comparando Dueño: ${orderId ? orderId.slice(0,5) : 'nulo'} con Yo: ${myId ? myId.slice(0,5) : 'nulo'}`);
-
-              if (orderId === myId) {
-                addNotification(`📦 Tu pedido ahora está: ${payload.new.status}`);
-              } else {
-                 toast.error("Los IDs no coinciden, ignorando...");
-              }
-            }
-          }
-        )
-        .subscribe((status) => {
-          if (status === 'SUBSCRIBED') {
-             // Solo para confirmar que sí se conectó al entrar
-             console.log("Conectado a Supabase Realtime");
-          }
-        });
+              // Como ya está filtrado desde el servidor, sabemos que 100% es para nosotros
+              const nuevoEstado = payload.new.status;
+              
+              toast.success(`Tu pedido ahora está: ${nuevoEstado}`); // Chismoso visual
+              addNotification(`📦 Tu pedido cambió a: ${nuevoEstado}`);
+              
+          })
+          .subscribe();
+      }
     };
 
     setupRealtime();
 
+    // Reconexión para celulares
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible') {
         if (channel) supabase.removeChannel(channel);
         setupRealtime();
       }
     };
-
     document.addEventListener('visibilitychange', handleVisibilityChange);
 
     return () => {
