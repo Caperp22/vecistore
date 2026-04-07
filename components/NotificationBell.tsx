@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 import { toast } from 'sonner';
 
@@ -10,7 +10,6 @@ export default function NotificationBell() {
   const [unread, setUnread] = useState(false);
 
   useEffect(() => {
-    // 1. Cargar notificaciones del historial
     const saved = localStorage.getItem('veci_notifications');
     if (saved) setNotifications(JSON.parse(saved));
 
@@ -24,33 +23,24 @@ export default function NotificationBell() {
       const isAdmin = session.user.email === 'caperp22@gmail.com';
 
       if (isAdmin) {
-        // --- CANAL DEL ADMIN ---
-        // Solo escucha cuando entra un pedido NUEVO (INSERT)
         channel = supabase
           .channel('admin-channel')
           .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'orders' }, () => {
              addNotification('🛒 ¡Nuevo pedido recibido!');
           })
           .subscribe();
-          
       } else {
-        // --- CANAL DEL CLIENTE (EL ARREGLO ESTÁ AQUÍ) ---
-        // Usamos "filter" para que Supabase solo nos mande los cambios de ESTE usuario
         channel = supabase
           .channel(`client-${myId}`)
           .on('postgres_changes', { 
               event: 'UPDATE', 
               schema: 'public', 
               table: 'orders',
-              filter: `user_id=eq.${myId}` // 🔥 Filtro mágico de seguridad
+              filter: `user_id=eq.${myId}` 
             }, (payload) => {
-              
-              // Como ya está filtrado desde el servidor, sabemos que 100% es para nosotros
               const nuevoEstado = payload.new.status;
-              
-              toast.success(`Tu pedido ahora está: ${nuevoEstado}`); // Chismoso visual
+              toast.success(`Tu pedido ahora está: ${nuevoEstado}`); 
               addNotification(`📦 Tu pedido cambió a: ${nuevoEstado}`);
-              
           })
           .subscribe();
       }
@@ -58,7 +48,6 @@ export default function NotificationBell() {
 
     setupRealtime();
 
-    // Reconexión para celulares
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible') {
         if (channel) supabase.removeChannel(channel);
@@ -82,32 +71,50 @@ export default function NotificationBell() {
       return updated;
     });
 
+    // 1. Encendemos la luz roja
     setUnread(true);
-    const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
-    audio.play().catch(() => {});
+
+    // 2. Intentamos el sonido (El PC lo dejará sonar, el móvil probablemente lo silencie)
+    try {
+      const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
+      audio.play().catch(() => console.log("Sonido silenciado por el navegador móvil"));
+    } catch(e) {}
+
+    // 3. TRUCO MÓVIL: Hacer que el celular vibre (2 toques rápidos)
+    if (typeof navigator !== 'undefined' && navigator.vibrate) {
+      navigator.vibrate([200, 100, 200]); 
+    }
   };
 
   return (
     <div className="relative">
-      <button onClick={() => { setIsOpen(!isOpen); setUnread(false); }} className="p-2 text-zinc-500 hover:text-indigo-600 transition-colors relative">
+      <button onClick={() => { setIsOpen(!isOpen); setUnread(false); }} className="p-2 text-zinc-500 hover:text-indigo-600 transition-colors relative flex items-center justify-center">
         <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
         </svg>
-        {unread && <span className="absolute top-2 right-2 w-3 h-3 bg-red-500 border-2 border-white dark:border-black rounded-full scale-110 animate-pulse"></span>}
+        
+        {/* NUEVA LUZ ROJA: Estilo Radar (Imposible no verla) */}
+        {unread && (
+          <span className="absolute top-1.5 right-1.5 flex h-3 w-3">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+            <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500 border border-white dark:border-black"></span>
+          </span>
+        )}
       </button>
 
       {isOpen && (
         <div className="absolute right-0 mt-2 w-72 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl shadow-2xl z-50 overflow-hidden">
-          <div className="p-4 border-b border-zinc-100 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-800/50">
+          <div className="p-4 border-b border-zinc-100 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-800/50 flex justify-between items-center">
             <h4 className="font-black text-[10px] uppercase tracking-widest text-zinc-500">Notificaciones</h4>
+            {unread && <span className="bg-red-500 text-white text-[9px] font-bold px-2 py-0.5 rounded-full">NUEVA</span>}
           </div>
           <div className="max-h-60 overflow-y-auto">
             {notifications.length === 0 ? (
               <p className="p-8 text-center text-zinc-500 text-sm">No hay novedades.</p>
             ) : (
               notifications.map((n, i) => (
-                <div key={i} className="p-4 border-b border-zinc-50 dark:border-zinc-800/50 hover:bg-zinc-50 dark:hover:bg-zinc-800/30">
-                  <p className="text-sm font-bold">{n.text}</p>
+                <div key={i} className={`p-4 border-b border-zinc-50 dark:border-zinc-800/50 hover:bg-zinc-50 dark:hover:bg-zinc-800/30 ${i === 0 && unread ? 'bg-indigo-50/50 dark:bg-indigo-500/10' : ''}`}>
+                  <p className="text-sm font-bold text-zinc-800 dark:text-zinc-200">{n.text}</p>
                   <p className="text-[10px] text-zinc-400 mt-1">{n.time}</p>
                 </div>
               ))
