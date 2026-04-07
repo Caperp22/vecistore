@@ -13,30 +13,54 @@ export default function PerfilPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const validarYTraerPedidos = async () => {
-      // 1. Le preguntamos DIRECTAMENTE a Supabase (evita el falso positivo al refrescar)
-      const { data: { session } } = await supabase.auth.getSession();
+      let isMounted = true; // Para evitar errores si cambias de página rápido
 
-      if (!session?.user) {
-        router.push('/login');
-        return;
-      }
+      const traerPedidos = async (userId: string) => {
+        const { data } = await supabase
+          .from('orders')
+          .select('*')
+          .eq('user_id', userId)
+          .order('created_at', { ascending: false });
 
-      // 2. Si hay sesión, procedemos a buscar los pedidos del usuario
-      const { data, error } = await supabase
-        .from('orders')
-        .select('*')
-        .eq('user_id', session.user.id)
-        .order('created_at', { ascending: false });
+        if (data && isMounted) setPedidos(data);
+        if (isMounted) setLoading(false);
+      };
 
-      if (data) setPedidos(data);
-      
-      // 3. Apagamos la pantalla de carga
-      setLoading(false);
-    };
+      // 1. Escuchamos si la sesión "despierta" mientras carga
+      const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+        if (session?.user && isMounted) {
+          traerPedidos(session.user.id);
+        }
+      });
 
-    validarYTraerPedidos();
-  }, [router]);
+      // 2. Revisión inicial con "Tolerancia Móvil"
+      const revisarConPaciencia = async () => {
+        const { data: { session } } = await supabase.auth.getSession();
+        
+        if (session?.user) {
+          // Si la encontró rápido, perfecto
+          traerPedidos(session.user.id);
+        } else {
+          // ¡EL SECRETO ESTÁ AQUÍ! No lo expulsamos de inmediato.
+          // Le damos 1000 milisegundos (1 seg) al celular para reaccionar.
+          setTimeout(async () => {
+            if (!isMounted) return;
+            const { data: { session: recheck } } = await supabase.auth.getSession();
+            
+            if (!recheck?.user) {
+              router.push('/login'); // Ahora sí, si después de 1 seg no hay nada, es que no está logueado
+            }
+          }, 1000); 
+        }
+      };
+
+      revisarConPaciencia();
+
+      return () => {
+        isMounted = false;
+        subscription.unsubscribe();
+      };
+    }, [router]);
 
   // Pantalla de carga mejorada mientras Supabase verifica la sesión
   if (loading) {
