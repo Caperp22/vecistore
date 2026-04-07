@@ -5,7 +5,15 @@ import { supabase } from '../../../lib/supabase';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 
-// --- COMPONENTE SELECTOR PREMIUM (Anti-Saltos de Línea) ---
+// 🔥 DICCIONARIO DE SUBCATEGORÍAS (Puedes editar estos nombres a tu gusto)
+const SUBCATEGORIAS_MAP: Record<string, string[]> = {
+  'Amigurumis': ['Personajes', 'Animales', 'Llaveros', 'Gorros', 'Personalizados', 'Otros'],
+  'Impresión 3D': ['Figuras', 'Macetas', 'Mecánicos', 'Accesorios', 'Repuestos', 'Otros'],
+  'Manualidades': ['Resina', 'Papelería', 'Arcilla', 'Tela', 'Pintura', 'Otros'],
+  'Hama Beads': ['Llaveros', 'Imanes', 'Cuadros', 'Posavasos', 'Figuras', 'Otros']
+};
+
+// --- COMPONENTE SELECTOR PREMIUM ---
 const StatusSelector = ({ estadoActual, onCambiarEstado, isHistorial }: any) => {
   const [isOpen, setIsOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -73,12 +81,14 @@ const StatusSelector = ({ estadoActual, onCambiarEstado, isHistorial }: any) => 
 export default function Dashboard() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState('orders'); 
+  const [activeTab, setActiveTab] = useState('products'); // Lo puse por defecto en Inventario para que lo pruebes de una vez
   const [orderFilter, setOrderFilter] = useState('Pendiente'); 
 
-  const [selectedProduct, setSelectedProduct] = useState<any | null>(null);
+  // ESTADOS DE FILTROS PARA EL INVENTARIO
+  const [inventoryCatFilter, setInventoryCatFilter] = useState('Todas');
+  const [inventorySubcatFilter, setInventorySubcatFilter] = useState('Todas');
 
-  // 🔥 NUEVOS ESTADOS PARA EL INVENTARIO
+  const [selectedProduct, setSelectedProduct] = useState<any | null>(null);
   const [isInventoryModalOpen, setIsInventoryModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<any | null>(null);
 
@@ -86,10 +96,12 @@ export default function Dashboard() {
   const [pedidos, setPedidos] = useState<any[]>([]);
   const [products, setProducts] = useState<any[]>([]);
 
+  // ESTADOS DEL FORMULARIO DE PRODUCTO
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [price, setPrice] = useState('');
   const [categoryId, setCategoryId] = useState('');
+  const [subcategory, setSubcategory] = useState(''); // 🔥 NUEVO CAMPO
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
 
@@ -169,7 +181,7 @@ export default function Dashboard() {
   // 🔥 LÓGICA DE GESTIÓN DE INVENTARIO
   const openNewProductModal = () => {
     setEditingProduct(null);
-    setTitle(''); setPrice(''); setCategoryId(''); setDescription(''); setImageFile(null);
+    setTitle(''); setPrice(''); setCategoryId(''); setSubcategory(''); setDescription(''); setImageFile(null);
     setIsInventoryModalOpen(true);
   };
 
@@ -178,8 +190,9 @@ export default function Dashboard() {
     setTitle(producto.title); 
     setPrice(producto.price.toString()); 
     setCategoryId(producto.category_id?.toString() || ''); 
+    setSubcategory(producto.subcategory || ''); // Carga la subcategoría guardada
     setDescription(producto.description); 
-    setImageFile(null); // No requerimos foto nueva al editar
+    setImageFile(null); 
     setIsInventoryModalOpen(true);
   };
 
@@ -197,12 +210,12 @@ export default function Dashboard() {
     e.preventDefault();
     if (!editingProduct && !imageFile) return toast.error('Debes subir una imagen para el nuevo producto');
     if (!categoryId) return toast.error('Selecciona una categoría');
+    if (!subcategory) return toast.error('Selecciona una subcategoría');
     
     setUploading(true);
     try {
       let finalImageUrl = editingProduct?.image_url || '';
 
-      // Si subió una foto nueva, la guardamos
       if (imageFile) {
         const fileExt = imageFile.name.split('.').pop();
         const fileName = `${Date.now()}.${fileExt}`;
@@ -217,20 +230,18 @@ export default function Dashboard() {
         description,
         price: parseInt(price),
         category_id: parseInt(categoryId),
+        subcategory, // 🔥 Se guarda en la DB
         image_url: finalImageUrl
       };
 
       if (editingProduct) {
-        // Actualizar
         const { error } = await supabase.from('products').update(productData).eq('id', editingProduct.id);
         if (error) throw error;
         
-        // Reflejar cambio en la vista sin recargar
         const catName = categories.find(c => c.id === parseInt(categoryId))?.name;
         setProducts(prev => prev.map(p => p.id === editingProduct.id ? { ...p, ...productData, categories: { name: catName } } : p));
         toast.success('Producto actualizado ✏️');
       } else {
-        // Insertar Nuevo
         const { data, error } = await supabase.from('products').insert([productData]).select('*, categories(name)');
         if (error) throw error;
         if (data) setProducts(prev => [data[0], ...prev]);
@@ -244,6 +255,17 @@ export default function Dashboard() {
       setUploading(false); 
     }
   };
+
+  // 🔥 LÓGICA DE FILTRADO PARA EL CATÁLOGO DE INVENTARIO
+  const filteredProducts = products.filter(p => {
+    const matchesCat = inventoryCatFilter === 'Todas' || p.categories?.name === inventoryCatFilter;
+    const matchesSubcat = inventorySubcatFilter === 'Todas' || p.subcategory === inventorySubcatFilter;
+    return matchesCat && matchesSubcat;
+  });
+
+  // Saber qué nombre de categoría está seleccionada en el Formulario para mostrar sus subcategorías
+  const selectedCategoryNameForm = categories.find(c => c.id.toString() === categoryId)?.name || '';
+  const availableSubcategoriesForm = selectedCategoryNameForm ? SUBCATEGORIAS_MAP[selectedCategoryNameForm] || [] : [];
 
   if (loading) return <div className="py-32 text-center animate-pulse text-zinc-500 font-medium text-sm">Cargando Centro de Inteligencia...</div>;
 
@@ -268,7 +290,6 @@ export default function Dashboard() {
       {/* --- MÓDULO 1: PEDIDOS --- */}
       {activeTab === 'orders' && (
         <div className="animate-in fade-in duration-300">
-          
           <div className="flex flex-wrap gap-2 mb-6 border-b border-zinc-200 dark:border-zinc-800 pb-4">
             {['Pendiente', 'En preparación', 'Enviado', 'Historial'].map((f) => {
               const cantidad = f === 'Historial' 
@@ -478,44 +499,88 @@ export default function Dashboard() {
         </div>
       )}
 
-      {/* --- MÓDULO 3: GESTIÓN DE INVENTARIO (NUEVO CRUD) --- */}
+      {/* --- MÓDULO 3: GESTIÓN DE INVENTARIO (CON SUBCATEGORÍAS) --- */}
       {activeTab === 'products' && (
         <div className="animate-in fade-in duration-300">
           
-          {/* Cabecera del Inventario */}
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
             <div>
               <h2 className="text-xl font-bold text-zinc-900 dark:text-white">Catálogo de Productos</h2>
               <p className="text-sm text-zinc-500 mt-1">Tienes {products.length} artículos publicados en tu tienda.</p>
             </div>
             <button 
               onClick={openNewProductModal}
-              className="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2.5 rounded-xl font-bold shadow-md shadow-indigo-500/20 transition-all flex items-center gap-2 text-sm"
+              className="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2.5 rounded-xl font-bold shadow-md shadow-indigo-500/20 transition-all flex items-center gap-2 text-sm shrink-0"
             >
               <span>➕</span> Añadir Producto
             </button>
           </div>
 
-          {/* Cuadrícula de Productos */}
-          {products.length === 0 ? (
+          {/* 🔥 BARRA DE FILTROS INTELIGENTE 🔥 */}
+          <div className="bg-white dark:bg-[#111] p-4 rounded-2xl border border-zinc-200 dark:border-zinc-800 flex flex-col sm:flex-row gap-4 mb-6 shadow-sm">
+            <div className="flex-1">
+              <label className="text-[10px] font-bold uppercase text-zinc-400 tracking-widest mb-2 block">Filtrar por Categoría</label>
+              <div className="flex flex-wrap gap-2">
+                <button 
+                  onClick={() => { setInventoryCatFilter('Todas'); setInventorySubcatFilter('Todas'); }}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${inventoryCatFilter === 'Todas' ? 'bg-zinc-900 dark:bg-white text-white dark:text-black' : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-500 hover:bg-zinc-200 dark:hover:bg-zinc-700'}`}
+                >Todas</button>
+                {categories.map(c => (
+                  <button 
+                    key={c.id}
+                    onClick={() => { setInventoryCatFilter(c.name); setInventorySubcatFilter('Todas'); }}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${inventoryCatFilter === c.name ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-500/20 dark:text-indigo-400' : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-500 hover:bg-zinc-200 dark:hover:bg-zinc-700'}`}
+                  >{c.name}</button>
+                ))}
+              </div>
+            </div>
+
+            {/* Sub-filtros condicionales */}
+            {inventoryCatFilter !== 'Todas' && SUBCATEGORIAS_MAP[inventoryCatFilter] && (
+              <div className="flex-1 border-t sm:border-t-0 sm:border-l border-zinc-200 dark:border-zinc-800 pt-4 sm:pt-0 sm:pl-4">
+                <label className="text-[10px] font-bold uppercase text-zinc-400 tracking-widest mb-2 block">Subcategorías de {inventoryCatFilter}</label>
+                <div className="flex flex-wrap gap-2">
+                  <button 
+                    onClick={() => setInventorySubcatFilter('Todas')}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all border ${inventorySubcatFilter === 'Todas' ? 'border-indigo-500 text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-500/10' : 'border-transparent bg-zinc-50 dark:bg-zinc-900 text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-800'}`}
+                  >Todas</button>
+                  {SUBCATEGORIAS_MAP[inventoryCatFilter].map(sub => (
+                    <button 
+                      key={sub}
+                      onClick={() => setInventorySubcatFilter(sub)}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all border ${inventorySubcatFilter === sub ? 'border-indigo-500 text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-500/10' : 'border-transparent bg-zinc-50 dark:bg-zinc-900 text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-800'}`}
+                    >{sub}</button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Cuadrícula de Productos Filtrada */}
+          {filteredProducts.length === 0 ? (
             <div className="text-center py-20 bg-white dark:bg-[#111] rounded-2xl border border-dashed border-zinc-200 dark:border-zinc-800">
-              <span className="text-4xl opacity-50 mb-3 block">📦</span>
-              <p className="text-zinc-500 text-sm font-medium">No tienes productos todavía. ¡Añade el primero!</p>
+              <span className="text-4xl opacity-50 mb-3 block">👻</span>
+              <p className="text-zinc-500 text-sm font-medium">No se encontraron productos con estos filtros.</p>
             </div>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-              {products.map(p => (
+              {filteredProducts.map(p => (
                 <div key={p.id} className="bg-white dark:bg-[#111] border border-zinc-200 dark:border-zinc-800 rounded-2xl overflow-hidden shadow-sm hover:shadow-md hover:border-indigo-500/30 transition-all flex flex-col group">
                   
-                  {/* Foto y Categoría */}
                   <div className="h-48 w-full bg-zinc-100 dark:bg-zinc-900 relative overflow-hidden">
                     <img src={p.image_url} alt={p.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
-                    <div className="absolute top-2 right-2 bg-black/70 backdrop-blur-md text-white text-[10px] font-black px-2.5 py-1 rounded-md uppercase tracking-wider">
-                      {p.categories?.name || 'General'}
+                    <div className="absolute top-2 right-2 flex flex-col gap-1 items-end">
+                      <span className="bg-black/70 backdrop-blur-md text-white text-[10px] font-black px-2.5 py-1 rounded-md uppercase tracking-wider shadow-sm">
+                        {p.categories?.name || 'General'}
+                      </span>
+                      {p.subcategory && (
+                        <span className="bg-indigo-500/90 backdrop-blur-md text-white text-[9px] font-bold px-2 py-0.5 rounded shadow-sm">
+                          {p.subcategory}
+                        </span>
+                      )}
                     </div>
                   </div>
                   
-                  {/* Info y Acciones */}
                   <div className="p-4 flex flex-col flex-grow">
                     <h3 className="font-bold text-zinc-900 dark:text-white text-sm line-clamp-1" title={p.title}>{p.title}</h3>
                     <p className="text-zinc-500 text-xs mt-1.5 line-clamp-2 flex-grow">{p.description}</p>
@@ -549,7 +614,7 @@ export default function Dashboard() {
         </div>
       )}
 
-      {/* 🔥 MODAL PARA AÑADIR / EDITAR PRODUCTO 🔥 */}
+      {/* 🔥 MODAL PARA AÑADIR / EDITAR PRODUCTO (CON DROPDOWN DEPENDIENTE) 🔥 */}
       {isInventoryModalOpen && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in">
           <div className="bg-white dark:bg-[#111] border border-zinc-200 dark:border-zinc-800 rounded-3xl shadow-2xl max-w-lg w-full overflow-hidden flex flex-col relative animate-in zoom-in-95">
@@ -568,17 +633,39 @@ export default function Dashboard() {
                   <input type="text" placeholder="Nombre del producto" value={title} onChange={e => setTitle(e.target.value)} className="w-full p-3 text-sm bg-zinc-50 dark:bg-[#0A0A0A] rounded-xl outline-none border border-zinc-200 dark:border-zinc-800 focus:border-indigo-500 transition-colors" required />
                   <input type="number" placeholder="Precio ($)" value={price} onChange={e => setPrice(e.target.value)} className="w-full p-3 text-sm bg-zinc-50 dark:bg-[#0A0A0A] rounded-xl outline-none border border-zinc-200 dark:border-zinc-800 focus:border-indigo-500 transition-colors" required />
                </div>
-               <select value={categoryId} onChange={e => setCategoryId(e.target.value)} className="w-full p-3 text-sm bg-zinc-50 dark:bg-[#0A0A0A] rounded-xl outline-none border border-zinc-200 dark:border-zinc-800 focus:border-indigo-500 transition-colors text-zinc-700 dark:text-zinc-300" required>
-                  <option value="">Seleccionar Categoría...</option>
-                  {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-               </select>
+
+               <div className="grid grid-cols-2 gap-4">
+                 {/* Categoría Principal */}
+                 <select 
+                   value={categoryId} 
+                   onChange={e => {
+                     setCategoryId(e.target.value);
+                     setSubcategory(''); // Reseteamos la subcategoría si cambia la categoría principal
+                   }} 
+                   className="w-full p-3 text-sm bg-zinc-50 dark:bg-[#0A0A0A] rounded-xl outline-none border border-zinc-200 dark:border-zinc-800 focus:border-indigo-500 transition-colors text-zinc-700 dark:text-zinc-300" required
+                 >
+                    <option value="">Categoría Principal...</option>
+                    {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                 </select>
+
+                 {/* Subcategoría Dependiente */}
+                 <select 
+                   value={subcategory} 
+                   onChange={e => setSubcategory(e.target.value)} 
+                   disabled={!categoryId || availableSubcategoriesForm.length === 0}
+                   className="w-full p-3 text-sm bg-zinc-50 dark:bg-[#0A0A0A] rounded-xl outline-none border border-zinc-200 dark:border-zinc-800 focus:border-indigo-500 transition-colors text-zinc-700 dark:text-zinc-300 disabled:opacity-50 disabled:cursor-not-allowed" required
+                 >
+                    <option value="">Subcategoría...</option>
+                    {availableSubcategoriesForm.map((sub: string) => <option key={sub} value={sub}>{sub}</option>)}
+                 </select>
+               </div>
+
                <textarea placeholder="Descripción detallada..." value={description} onChange={e => setDescription(e.target.value)} className="w-full p-3 text-sm bg-zinc-50 dark:bg-[#0A0A0A] rounded-xl outline-none border border-zinc-200 dark:border-zinc-800 focus:border-indigo-500 transition-colors resize-none" rows={3} required />
                
                <div className="border-2 border-dashed border-zinc-200 dark:border-zinc-800 rounded-xl p-4 text-center hover:bg-zinc-50 dark:hover:bg-[#0A0A0A] transition-colors relative">
                  <input 
                    type="file" 
                    onChange={e => setImageFile(e.target.files?.[0] || null)} 
-                   // Solo es obligatorio si estamos creando uno nuevo
                    required={!editingProduct} 
                    className="w-full text-sm text-zinc-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-indigo-50 file:text-indigo-600 hover:file:bg-indigo-100 cursor-pointer" 
                  />
