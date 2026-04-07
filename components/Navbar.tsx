@@ -6,6 +6,7 @@ import { supabase } from '../lib/supabase';
 import CartWidget from './CartWidget';
 import UserMenu from './UserMenu';
 import { useTheme } from 'next-themes';
+import NotificationBell from './NotificationBell';
 
 export default function Navbar() {
   const [categories, setCategories] = useState<any[]>([]);
@@ -58,6 +59,7 @@ export default function Navbar() {
                   )}
                 </button>
               )}
+              <NotificationBell />
               <UserMenu />
               <CartWidget />
             </div>
@@ -79,6 +81,7 @@ export default function Navbar() {
               </button>
             )}
             
+            <NotificationBell />
             <UserMenu />
             <CartWidget />
             
