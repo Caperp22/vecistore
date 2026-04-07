@@ -105,7 +105,7 @@ export default function PerfilPage() {
       ) : (
         <div className="space-y-8">
           {pedidos.map((pedido) => (
-            <div key={pedido.id} className="bg-white dark:bg-[#111111] p-6 sm:p-8 rounded-[2rem] shadow-sm border border-zinc-200/60 dark:border-zinc-800/60 hover:shadow-lg hover:shadow-indigo-500/5 dark:hover:shadow-indigo-500/10 transition-all duration-300">
+            <div key={pedido.id} className="bg-white dark:bg-[#111111] p-6 sm:p-8 rounded-4xl shadow-sm border border-zinc-200/60 dark:border-zinc-800/60 hover:shadow-lg hover:shadow-indigo-500/5 dark:hover:shadow-indigo-500/10 transition-all duration-300">
               
               {/* Bloque Superior: Fecha y Estado */}
               <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center border-b border-zinc-100 dark:border-zinc-800/60 pb-5 mb-6 gap-4">

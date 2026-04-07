@@ -17,7 +17,6 @@ const StatusSelector = ({ estadoActual, onCambiarEstado, isHistorial }: any) => 
     { nombre: 'Entregado', color: 'bg-green-500', shadow: 'shadow-green-500/50', icon: '🟢' }
   ];
 
-  // Si está en el historial (entregado) o enviado, limitamos las opciones para evitar errores
   const estadosPermitidos = isHistorial 
     ? todosLosEstados.filter(e => e.nombre === 'Enviado' || e.nombre === 'Entregado')
     : todosLosEstados;
@@ -70,7 +69,6 @@ const StatusSelector = ({ estadoActual, onCambiarEstado, isHistorial }: any) => 
   );
 };
 // -----------------------------------
-
 
 export default function Dashboard() {
   const router = useRouter();
@@ -218,69 +216,90 @@ export default function Dashboard() {
       )}
 
       {/* --- MÓDULO 2: PEDIDOS --- */}
-        {activeTab === 'orders' && (
+      {activeTab === 'orders' && (
         <div className="animate-in fade-in duration-500">
-            {/* Sub-filtros actualizados con "Enviado" */}
-            <div className="flex flex-wrap gap-2 mb-8 bg-zinc-100 dark:bg-zinc-900/50 p-1.5 rounded-2xl w-max border border-zinc-200 dark:border-zinc-800">
-            {['Pendiente', 'En preparación', 'Enviado', 'Historial'].map((f) => (
-                <button 
-                key={f}
-                onClick={() => setOrderFilter(f)}
-                className={`px-5 sm:px-6 py-2.5 rounded-xl text-sm font-black transition-all ${orderFilter === f ? 'bg-white dark:bg-zinc-800 text-indigo-600 shadow-sm border border-zinc-200 dark:border-zinc-700' : 'text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300'}`}
-                >
-                {f === 'Historial' ? '📦 Historial' : f}
-                </button>
-            ))}
-            </div>
+          
+          {/* 🔥 AQUÍ ESTÁ LA MAGIA DE LOS CONTADORES 🔥 */}
+          <div className="flex flex-wrap gap-2 mb-8 bg-zinc-100 dark:bg-zinc-900/50 p-1.5 rounded-2xl w-max border border-zinc-200 dark:border-zinc-800">
+            {['Pendiente', 'En preparación', 'Enviado', 'Historial'].map((f) => {
+              
+              // 1. Calculamos cuántos pedidos hay en este estado
+              const cantidad = f === 'Historial' 
+                ? pedidos.filter(p => p.status === 'Entregado').length
+                : pedidos.filter(p => p.status === f).length;
 
-            <div className="grid grid-cols-1 gap-6">
+              return (
+                <button 
+                  key={f}
+                  onClick={() => setOrderFilter(f)}
+                  // Le agregamos flex y gap-2 para que el texto y el número queden alineados
+                  className={`flex items-center gap-2 px-5 sm:px-6 py-2.5 rounded-xl text-sm font-black transition-all ${
+                    orderFilter === f 
+                      ? 'bg-white dark:bg-zinc-800 text-indigo-600 shadow-sm border border-zinc-200 dark:border-zinc-700' 
+                      : 'text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300'
+                  }`}
+                >
+                  {f === 'Historial' ? '📦 Historial' : f}
+                  
+                  {/* 2. Dibujamos la burbuja con el número */}
+                  <span className={`px-2 py-0.5 rounded-full text-[10px] ${
+                    orderFilter === f 
+                      ? 'bg-indigo-100 dark:bg-indigo-500/20 text-indigo-600 dark:text-indigo-400' 
+                      : 'bg-zinc-200 dark:bg-zinc-800/80 text-zinc-500 dark:text-zinc-400'
+                  }`}>
+                    {cantidad}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+
+          <div className="grid grid-cols-1 gap-6">
             {pedidos
-                .filter(p => {
-                // El historial ahora muestra SOLO los entregados
+              .filter(p => {
                 if (orderFilter === 'Historial') return p.status === 'Entregado';
                 return p.status === orderFilter;
-                })
-                .map(pedido => (
+              })
+              .map(pedido => (
                 <div key={pedido.id} className="bg-white dark:bg-[#111111] p-8 rounded-[2rem] border border-zinc-200 dark:border-zinc-800 flex flex-col lg:flex-row justify-between gap-8 hover:border-indigo-500/30 transition-colors shadow-sm">
-                    <div className="space-y-4 flex-grow">
+                  <div className="space-y-4 flex-grow">
                     <div className="flex items-center gap-3">
-                        <span className="text-2xl bg-zinc-100 dark:bg-zinc-900 p-3 rounded-xl">👤</span>
-                        <div>
+                      <span className="text-2xl bg-zinc-100 dark:bg-zinc-900 p-3 rounded-xl">👤</span>
+                      <div>
                         <h4 className="font-black text-lg leading-tight text-zinc-900 dark:text-white">{pedido.customer_info?.name}</h4>
                         <p className="text-zinc-500 text-sm font-medium">{pedido.customer_info?.phone} • {new Date(pedido.created_at).toLocaleDateString()}</p>
-                        </div>
+                      </div>
                     </div>
                     <div className="bg-zinc-50 dark:bg-zinc-900/50 p-5 rounded-2xl border border-zinc-100 dark:border-zinc-800">
-                        {pedido.items.map((item: any, i: number) => (
+                      {pedido.items.map((item: any, i: number) => (
                         <p key={i} className="text-sm font-bold text-zinc-600 dark:text-zinc-400 mb-1 last:mb-0">
-                            <span className="text-indigo-500 bg-indigo-50 dark:bg-indigo-500/10 px-2 py-0.5 rounded mr-2">{item.cantidad}x</span> 
-                            {item.title}
+                          <span className="text-indigo-500 bg-indigo-50 dark:bg-indigo-500/10 px-2 py-0.5 rounded mr-2">{item.cantidad}x</span> 
+                          {item.title}
                         </p>
-                        ))}
+                      ))}
                     </div>
-                    </div>
+                  </div>
 
-                    <div className="lg:w-72 flex flex-col justify-between items-end gap-6">
+                  <div className="lg:w-72 flex flex-col justify-between items-end gap-6">
                     <div className="text-right">
-                        <p className="text-[10px] font-black uppercase text-zinc-400 tracking-widest mb-1">Total Pedido</p>
-                        <h5 className="text-3xl font-black text-zinc-900 dark:text-white">${pedido.total.toLocaleString('es-CO')}</h5>
+                      <p className="text-[10px] font-black uppercase text-zinc-400 tracking-widest mb-1">Total Pedido</p>
+                      <h5 className="text-3xl font-black text-zinc-900 dark:text-white">${pedido.total.toLocaleString('es-CO')}</h5>
                     </div>
 
-                    {/* SELECTOR PREMIUM IMPLEMENTADO */}
                     <div className="w-full">
-                        <p className="text-[10px] font-black uppercase text-zinc-400 tracking-widest mb-2">Gestionar Estado</p>
-                        <StatusSelector 
-                          estadoActual={pedido.status} 
-                          isHistorial={orderFilter === 'Historial'}
-                          onCambiarEstado={(nuevoEstado: string) => updateOrderStatus(pedido.id, nuevoEstado)}
-                        />
+                      <p className="text-[10px] font-black uppercase text-zinc-400 tracking-widest mb-2">Gestionar Estado</p>
+                      <StatusSelector 
+                        estadoActual={pedido.status} 
+                        isHistorial={orderFilter === 'Historial'}
+                        onCambiarEstado={(nuevoEstado: string) => updateOrderStatus(pedido.id, nuevoEstado)}
+                      />
                     </div>
-                    </div>
+                  </div>
                 </div>
-                ))}
-            </div>
+              ))}
+          </div>
         </div>
-        )}
+      )}
 
       {/* --- MÓDULO 3: INVENTARIO --- */}
       {activeTab === 'products' && (

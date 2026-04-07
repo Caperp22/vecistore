@@ -27,7 +27,7 @@ export default async function CategoriaPage({ params }: { params: Promise<{ slug
 
       {/* Grilla de Productos o Mensaje de Vacío */}
       {products?.length === 0 ? (
-        <div className="py-20 text-center border-2 border-dashed border-zinc-200 dark:border-zinc-800 rounded-[2rem]">
+        <div className="py-20 text-center border-2 border-dashed border-zinc-200 dark:border-zinc-800 rounded-4xl]">
           <p className="text-zinc-500 dark:text-zinc-400 text-lg font-medium">Aún no hay creaciones en esta categoría.</p>
         </div>
       ) : (
