@@ -76,8 +76,11 @@ export default function Dashboard() {
   const [activeTab, setActiveTab] = useState('orders'); 
   const [orderFilter, setOrderFilter] = useState('Pendiente'); 
 
-  // ESTADO PARA EL MODAL DEL PRODUCTO
   const [selectedProduct, setSelectedProduct] = useState<any | null>(null);
+
+  // 🔥 NUEVOS ESTADOS PARA EL INVENTARIO
+  const [isInventoryModalOpen, setIsInventoryModalOpen] = useState(false);
+  const [editingProduct, setEditingProduct] = useState<any | null>(null);
 
   const [categories, setCategories] = useState<any[]>([]);
   const [pedidos, setPedidos] = useState<any[]>([]);
@@ -101,7 +104,7 @@ export default function Dashboard() {
       const [catsRes, ordersRes, prodRes] = await Promise.all([
         supabase.from('categories').select('*'),
         supabase.from('orders').select('*').order('created_at', { ascending: false }),
-        supabase.from('products').select('*, categories(name)')
+        supabase.from('products').select('*, categories(name)').order('created_at', { ascending: false })
       ]);
 
       if (catsRes.data) setCategories(catsRes.data);
@@ -113,29 +116,22 @@ export default function Dashboard() {
     fetchAdminData();
   }, [router]);
 
-  // 🔥 LÓGICA DE ESTADÍSTICAS PREMIUM (Actualizado)
   const stats = useMemo(() => {
-    // 1. Totales básicos
     const totalVentas = pedidos.reduce((acc, p) => acc + p.total, 0);
     const ventasHoy = pedidos.filter(p => new Date(p.created_at).toDateString() === new Date().toDateString()).length;
-    
-    // 2. Ticket Promedio (AOV)
     const ticketPromedio = pedidos.length > 0 ? Math.round(totalVentas / pedidos.length) : 0;
     
-    // 3. Mapas de Datos
     const catMap: any = {};
     const prodMap: any = {};
-    const clientMap: any = {}; // Para Clientes VIP
+    const clientMap: any = {}; 
 
     pedidos.forEach(p => {
-      // Categorías y Productos
       p.items.forEach((item: any) => {
         const catName = item.category_name || 'General'; 
         catMap[catName] = (catMap[catName] || 0) + (item.price * item.cantidad);
         prodMap[item.title] = (prodMap[item.title] || 0) + item.cantidad;
       });
 
-      // Clientes VIP (Suma del dinero gastado por cada cliente)
       const clientName = p.customer_info?.name || 'Desconocido';
       clientMap[clientName] = (clientMap[clientName] || 0) + p.total;
     });
@@ -143,10 +139,9 @@ export default function Dashboard() {
     const topProducts = Object.entries(prodMap).sort(([, a]: any, [, b]: any) => b - a).slice(0, 5);
     const topClientes = Object.entries(clientMap).sort(([, a]: any, [, b]: any) => b - a).slice(0, 5);
 
-    // 4. Lógica del Gráfico de los Últimos 7 días
     const ultimos7Dias = Array.from({length: 7}).map((_, i) => {
       const d = new Date();
-      d.setDate(d.getDate() - (6 - i)); // Retrocedemos días
+      d.setDate(d.getDate() - (6 - i)); 
       const dateStr = d.toDateString();
       const dayName = d.toLocaleDateString('es-CO', { weekday: 'short' }).toUpperCase();
       
@@ -157,7 +152,6 @@ export default function Dashboard() {
       return { nombre: dayName, total: totalDia };
     });
 
-    // Encontrar el día con más ventas para escalar las barras del gráfico
     const maxVentaDia = Math.max(...ultimos7Dias.map(d => d.total)) || 1;
 
     return { totalVentas, ventasHoy, ticketPromedio, catMap, topProducts, topClientes, ultimos7Dias, maxVentaDia };
@@ -170,6 +164,85 @@ export default function Dashboard() {
       setPedidos(prev => prev.map(p => p.id === orderId ? { ...p, status: newStatus, updated_at: new Date().toISOString() } : p));
       toast.success(`Pedido movido a ${newStatus}`);
     } catch (e: any) { toast.error(e.message); }
+  };
+
+  // 🔥 LÓGICA DE GESTIÓN DE INVENTARIO
+  const openNewProductModal = () => {
+    setEditingProduct(null);
+    setTitle(''); setPrice(''); setCategoryId(''); setDescription(''); setImageFile(null);
+    setIsInventoryModalOpen(true);
+  };
+
+  const openEditProductModal = (producto: any) => {
+    setEditingProduct(producto);
+    setTitle(producto.title); 
+    setPrice(producto.price.toString()); 
+    setCategoryId(producto.category_id?.toString() || ''); 
+    setDescription(producto.description); 
+    setImageFile(null); // No requerimos foto nueva al editar
+    setIsInventoryModalOpen(true);
+  };
+
+  const handleDeleteProduct = async (id: number) => {
+    if (!confirm('¿Seguro que deseas eliminar este producto? Esta acción no se puede deshacer.')) return;
+    try {
+      const { error } = await supabase.from('products').delete().eq('id', id);
+      if (error) throw error;
+      setProducts(prev => prev.filter(p => p.id !== id));
+      toast.success('Producto eliminado 🗑️');
+    } catch (err: any) { toast.error(err.message); }
+  };
+
+  const handleProductSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingProduct && !imageFile) return toast.error('Debes subir una imagen para el nuevo producto');
+    if (!categoryId) return toast.error('Selecciona una categoría');
+    
+    setUploading(true);
+    try {
+      let finalImageUrl = editingProduct?.image_url || '';
+
+      // Si subió una foto nueva, la guardamos
+      if (imageFile) {
+        const fileExt = imageFile.name.split('.').pop();
+        const fileName = `${Date.now()}.${fileExt}`;
+        const { error: uploadError } = await supabase.storage.from('products').upload(fileName, imageFile);
+        if (uploadError) throw uploadError;
+        const { data: publicUrlData } = supabase.storage.from('products').getPublicUrl(fileName);
+        finalImageUrl = publicUrlData.publicUrl;
+      }
+
+      const productData = {
+        title,
+        description,
+        price: parseInt(price),
+        category_id: parseInt(categoryId),
+        image_url: finalImageUrl
+      };
+
+      if (editingProduct) {
+        // Actualizar
+        const { error } = await supabase.from('products').update(productData).eq('id', editingProduct.id);
+        if (error) throw error;
+        
+        // Reflejar cambio en la vista sin recargar
+        const catName = categories.find(c => c.id === parseInt(categoryId))?.name;
+        setProducts(prev => prev.map(p => p.id === editingProduct.id ? { ...p, ...productData, categories: { name: catName } } : p));
+        toast.success('Producto actualizado ✏️');
+      } else {
+        // Insertar Nuevo
+        const { data, error } = await supabase.from('products').insert([productData]).select('*, categories(name)');
+        if (error) throw error;
+        if (data) setProducts(prev => [data[0], ...prev]);
+        toast.success('Producto publicado 🎉');
+      }
+
+      setIsInventoryModalOpen(false);
+    } catch (err: any) { 
+      toast.error(err.message); 
+    } finally { 
+      setUploading(false); 
+    }
   };
 
   if (loading) return <div className="py-32 text-center animate-pulse text-zinc-500 font-medium text-sm">Cargando Centro de Inteligencia...</div>;
@@ -293,11 +366,10 @@ export default function Dashboard() {
         </div>
       )}
 
-      {/* --- MÓDULO 2: MÉTRICAS (VERSIÓN PREMIUM) --- */}
+      {/* --- MÓDULO 2: MÉTRICAS --- */}
       {activeTab === 'metrics' && (
         <div className="space-y-6 animate-in fade-in duration-300">
           
-          {/* Fila 1: KPIs Principales (4 columnas) */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
             <div className="bg-white dark:bg-[#111] p-6 rounded-2xl border border-zinc-200 dark:border-zinc-800 shadow-sm relative overflow-hidden group">
               <p className="text-zinc-500 text-[10px] font-bold uppercase tracking-widest mb-1">Ingresos Totales</p>
@@ -314,7 +386,6 @@ export default function Dashboard() {
               <h3 className="text-2xl font-black text-green-500">{stats.ventasHoy}</h3>
               <span className="absolute top-4 right-4 text-3xl opacity-10 group-hover:opacity-20 transition-opacity rotate-12">🔥</span>
             </div>
-            {/* NUEVA KPI: TICKET PROMEDIO */}
             <div className="bg-white dark:bg-[#111] p-6 rounded-2xl border border-zinc-200 dark:border-zinc-800 shadow-sm relative overflow-hidden group">
               <p className="text-zinc-500 text-[10px] font-bold uppercase tracking-widest mb-1">Ticket Promedio</p>
               <h3 className="text-2xl font-black text-amber-500">${stats.ticketPromedio.toLocaleString('es-CO')}</h3>
@@ -322,7 +393,6 @@ export default function Dashboard() {
             </div>
           </div>
 
-          {/* Fila 2: Gráfico de Tendencia de 7 Días */}
           <div className="bg-white dark:bg-[#111] p-8 rounded-2xl border border-zinc-200 dark:border-zinc-800 shadow-sm">
             <div className="flex justify-between items-end mb-8">
               <div>
@@ -331,22 +401,18 @@ export default function Dashboard() {
               </div>
             </div>
             
-            {/* Gráfico de Barras CSS nativo */}
             <div className="h-48 w-full flex items-end justify-between gap-2 sm:gap-4 mt-4">
               {stats.ultimos7Dias.map((dia: any, idx: number) => {
                 const alturaPorcentaje = (dia.total / stats.maxVentaDia) * 100;
                 return (
                   <div key={idx} className="flex flex-col items-center justify-end w-full h-full group relative">
-                    {/* Tooltip Hover */}
                     <div className="absolute -top-10 opacity-0 group-hover:opacity-100 transition-opacity bg-zinc-900 dark:bg-white text-white dark:text-black text-[10px] font-bold py-1 px-2 rounded-lg pointer-events-none z-10 whitespace-nowrap">
                       ${dia.total.toLocaleString('es-CO')}
                     </div>
-                    {/* Barra */}
                     <div 
                       className={`w-full max-w-[3rem] rounded-t-lg transition-all duration-1000 ${dia.total === stats.maxVentaDia ? 'bg-indigo-500 shadow-[0_0_15px_rgba(99,102,241,0.4)]' : 'bg-zinc-200 dark:bg-zinc-800 group-hover:bg-indigo-300 dark:group-hover:bg-indigo-900'}`}
-                      style={{ height: `${Math.max(alturaPorcentaje, 5)}%` }} // Mínimo 5% de altura
+                      style={{ height: `${Math.max(alturaPorcentaje, 5)}%` }} 
                     ></div>
-                    {/* Etiqueta del Día */}
                     <span className="text-[10px] font-bold text-zinc-500 mt-3">{dia.nombre}</span>
                   </div>
                 );
@@ -354,10 +420,7 @@ export default function Dashboard() {
             </div>
           </div>
 
-          {/* Fila 3: Rankings (3 columnas) */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            
-            {/* Top Productos */}
             <div className="bg-white dark:bg-[#111] p-6 rounded-2xl border border-zinc-200 dark:border-zinc-800">
               <h4 className="text-sm font-bold mb-4 flex items-center gap-2 uppercase tracking-wider text-zinc-500">🛍️ Top Vendidos</h4>
               <div className="space-y-3">
@@ -374,7 +437,6 @@ export default function Dashboard() {
               </div>
             </div>
 
-            {/* Categorías */}
             <div className="bg-white dark:bg-[#111] p-6 rounded-2xl border border-zinc-200 dark:border-zinc-800">
               <h4 className="text-sm font-bold mb-4 flex items-center gap-2 uppercase tracking-wider text-zinc-500">📊 Por Categoría</h4>
               <div className="space-y-4 mt-2">
@@ -393,7 +455,6 @@ export default function Dashboard() {
               </div>
             </div>
 
-            {/* Top Clientes (Fidelidad) */}
             <div className="bg-white dark:bg-[#111] p-6 rounded-2xl border border-zinc-200 dark:border-zinc-800 relative overflow-hidden">
               <div className="absolute top-0 right-0 w-32 h-32 bg-amber-500/10 rounded-bl-full -z-10 blur-2xl"></div>
               <h4 className="text-sm font-bold mb-4 flex items-center gap-2 uppercase tracking-wider text-zinc-500">👑 Clientes VIP</h4>
@@ -417,53 +478,135 @@ export default function Dashboard() {
         </div>
       )}
 
-      {/* --- MÓDULO 3: INVENTARIO --- */}
+      {/* --- MÓDULO 3: GESTIÓN DE INVENTARIO (NUEVO CRUD) --- */}
       {activeTab === 'products' && (
-        <div className="max-w-2xl mx-auto animate-in fade-in duration-300">
-          <div className="bg-white dark:bg-[#111] p-8 rounded-2xl border border-zinc-200 dark:border-zinc-800 shadow-sm">
-            <h2 className="text-xl font-bold mb-6 text-zinc-900 dark:text-white">Añadir Nuevo Producto</h2>
-            <form onSubmit={async (e) => {
-              e.preventDefault();
-              if (!imageFile || !categoryId) return toast.error('Falta imagen o categoría');
-              setUploading(true);
-              try {
-                const fileExt = imageFile.name.split('.').pop();
-                const fileName = `${Date.now()}.${fileExt}`;
-                await supabase.storage.from('products').upload(fileName, imageFile);
-                const { data: publicUrlData } = supabase.storage.from('products').getPublicUrl(fileName);
-                await supabase.from('products').insert([{ title, description, price: parseInt(price), category_id: parseInt(categoryId), image_url: publicUrlData.publicUrl }]);
-                toast.success('Producto publicado 🎉');
-                setTitle(''); setDescription(''); setPrice(''); setCategoryId(''); setImageFile(null);
-              } catch (err: any) { toast.error(err.message); } finally { setUploading(false); }
-            }} className="space-y-4">
+        <div className="animate-in fade-in duration-300">
+          
+          {/* Cabecera del Inventario */}
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+            <div>
+              <h2 className="text-xl font-bold text-zinc-900 dark:text-white">Catálogo de Productos</h2>
+              <p className="text-sm text-zinc-500 mt-1">Tienes {products.length} artículos publicados en tu tienda.</p>
+            </div>
+            <button 
+              onClick={openNewProductModal}
+              className="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2.5 rounded-xl font-bold shadow-md shadow-indigo-500/20 transition-all flex items-center gap-2 text-sm"
+            >
+              <span>➕</span> Añadir Producto
+            </button>
+          </div>
+
+          {/* Cuadrícula de Productos */}
+          {products.length === 0 ? (
+            <div className="text-center py-20 bg-white dark:bg-[#111] rounded-2xl border border-dashed border-zinc-200 dark:border-zinc-800">
+              <span className="text-4xl opacity-50 mb-3 block">📦</span>
+              <p className="text-zinc-500 text-sm font-medium">No tienes productos todavía. ¡Añade el primero!</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+              {products.map(p => (
+                <div key={p.id} className="bg-white dark:bg-[#111] border border-zinc-200 dark:border-zinc-800 rounded-2xl overflow-hidden shadow-sm hover:shadow-md hover:border-indigo-500/30 transition-all flex flex-col group">
+                  
+                  {/* Foto y Categoría */}
+                  <div className="h-48 w-full bg-zinc-100 dark:bg-zinc-900 relative overflow-hidden">
+                    <img src={p.image_url} alt={p.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                    <div className="absolute top-2 right-2 bg-black/70 backdrop-blur-md text-white text-[10px] font-black px-2.5 py-1 rounded-md uppercase tracking-wider">
+                      {p.categories?.name || 'General'}
+                    </div>
+                  </div>
+                  
+                  {/* Info y Acciones */}
+                  <div className="p-4 flex flex-col flex-grow">
+                    <h3 className="font-bold text-zinc-900 dark:text-white text-sm line-clamp-1" title={p.title}>{p.title}</h3>
+                    <p className="text-zinc-500 text-xs mt-1.5 line-clamp-2 flex-grow">{p.description}</p>
+                    
+                    <div className="flex items-center justify-between mt-4 pt-4 border-t border-zinc-100 dark:border-zinc-800/80">
+                      <span className="font-black text-lg text-indigo-600 dark:text-indigo-400">${p.price?.toLocaleString('es-CO')}</span>
+                      
+                      <div className="flex gap-1.5">
+                        <button 
+                          onClick={() => openEditProductModal(p)} 
+                          className="p-1.5 text-zinc-400 hover:text-indigo-500 hover:bg-indigo-50 dark:hover:bg-indigo-500/10 rounded-lg transition-colors" 
+                          title="Editar Producto"
+                        >
+                          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
+                        </button>
+                        <button 
+                          onClick={() => handleDeleteProduct(p.id)} 
+                          className="p-1.5 text-zinc-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 rounded-lg transition-colors" 
+                          title="Eliminar Producto"
+                        >
+                          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* 🔥 MODAL PARA AÑADIR / EDITAR PRODUCTO 🔥 */}
+      {isInventoryModalOpen && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in">
+          <div className="bg-white dark:bg-[#111] border border-zinc-200 dark:border-zinc-800 rounded-3xl shadow-2xl max-w-lg w-full overflow-hidden flex flex-col relative animate-in zoom-in-95">
+            
+            <div className="flex justify-between items-center p-6 border-b border-zinc-100 dark:border-zinc-800/80">
+              <h2 className="text-xl font-bold text-zinc-900 dark:text-white">
+                {editingProduct ? '✏️ Editar Producto' : '🚀 Añadir Nuevo Producto'}
+              </h2>
+              <button onClick={() => setIsInventoryModalOpen(false)} className="bg-zinc-100 dark:bg-zinc-800 text-zinc-500 hover:text-zinc-900 dark:hover:text-white rounded-full p-2 transition-colors">
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+              </button>
+            </div>
+
+            <form onSubmit={handleProductSubmit} className="p-6 space-y-4">
                <div className="grid grid-cols-2 gap-4">
-                  <input type="text" placeholder="Nombre del producto" value={title} onChange={e => setTitle(e.target.value)} className="w-full p-3 text-sm bg-zinc-50 dark:bg-[#0A0A0A] rounded-xl outline-none border border-zinc-200 dark:border-zinc-800 focus:border-indigo-500 dark:focus:border-indigo-500 transition-colors" required />
-                  <input type="number" placeholder="Precio ($)" value={price} onChange={e => setPrice(e.target.value)} className="w-full p-3 text-sm bg-zinc-50 dark:bg-[#0A0A0A] rounded-xl outline-none border border-zinc-200 dark:border-zinc-800 focus:border-indigo-500 dark:focus:border-indigo-500 transition-colors" required />
+                  <input type="text" placeholder="Nombre del producto" value={title} onChange={e => setTitle(e.target.value)} className="w-full p-3 text-sm bg-zinc-50 dark:bg-[#0A0A0A] rounded-xl outline-none border border-zinc-200 dark:border-zinc-800 focus:border-indigo-500 transition-colors" required />
+                  <input type="number" placeholder="Precio ($)" value={price} onChange={e => setPrice(e.target.value)} className="w-full p-3 text-sm bg-zinc-50 dark:bg-[#0A0A0A] rounded-xl outline-none border border-zinc-200 dark:border-zinc-800 focus:border-indigo-500 transition-colors" required />
                </div>
-               <select value={categoryId} onChange={e => setCategoryId(e.target.value)} className="w-full p-3 text-sm bg-zinc-50 dark:bg-[#0A0A0A] rounded-xl outline-none border border-zinc-200 dark:border-zinc-800 focus:border-indigo-500 dark:focus:border-indigo-500 transition-colors text-zinc-700 dark:text-zinc-300" required>
+               <select value={categoryId} onChange={e => setCategoryId(e.target.value)} className="w-full p-3 text-sm bg-zinc-50 dark:bg-[#0A0A0A] rounded-xl outline-none border border-zinc-200 dark:border-zinc-800 focus:border-indigo-500 transition-colors text-zinc-700 dark:text-zinc-300" required>
                   <option value="">Seleccionar Categoría...</option>
                   {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                </select>
-               <textarea placeholder="Descripción detallada..." value={description} onChange={e => setDescription(e.target.value)} className="w-full p-3 text-sm bg-zinc-50 dark:bg-[#0A0A0A] rounded-xl outline-none border border-zinc-200 dark:border-zinc-800 focus:border-indigo-500 dark:focus:border-indigo-500 transition-colors resize-none" rows={4} required />
+               <textarea placeholder="Descripción detallada..." value={description} onChange={e => setDescription(e.target.value)} className="w-full p-3 text-sm bg-zinc-50 dark:bg-[#0A0A0A] rounded-xl outline-none border border-zinc-200 dark:border-zinc-800 focus:border-indigo-500 transition-colors resize-none" rows={3} required />
                
-               <div className="border-2 border-dashed border-zinc-200 dark:border-zinc-800 rounded-xl p-4 text-center hover:bg-zinc-50 dark:hover:bg-[#0A0A0A] transition-colors">
-                 <input type="file" onChange={e => setImageFile(e.target.files?.[0] || null)} className="w-full text-sm text-zinc-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-indigo-50 file:text-indigo-600 hover:file:bg-indigo-100 cursor-pointer" required />
+               <div className="border-2 border-dashed border-zinc-200 dark:border-zinc-800 rounded-xl p-4 text-center hover:bg-zinc-50 dark:hover:bg-[#0A0A0A] transition-colors relative">
+                 <input 
+                   type="file" 
+                   onChange={e => setImageFile(e.target.files?.[0] || null)} 
+                   // Solo es obligatorio si estamos creando uno nuevo
+                   required={!editingProduct} 
+                   className="w-full text-sm text-zinc-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-indigo-50 file:text-indigo-600 hover:file:bg-indigo-100 cursor-pointer" 
+                 />
+                 {editingProduct && !imageFile && (
+                   <p className="text-[10px] text-zinc-400 mt-2">Deja en blanco para conservar la imagen actual.</p>
+                 )}
                </div>
 
-               <button type="submit" disabled={uploading} className="w-full bg-indigo-600 text-white p-3.5 rounded-xl text-sm font-bold shadow-md shadow-indigo-500/20 hover:bg-indigo-700 transition-all disabled:opacity-50 mt-2">
-                {uploading ? 'Subiendo producto...' : 'Publicar Producto'}
-               </button>
+               <div className="pt-2">
+                 <button type="submit" disabled={uploading} className="w-full bg-indigo-600 text-white p-3.5 rounded-xl text-sm font-bold shadow-md shadow-indigo-500/20 hover:bg-indigo-700 transition-all disabled:opacity-50 flex items-center justify-center gap-2">
+                  {uploading ? (
+                    <>
+                      <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
+                      Guardando...
+                    </>
+                  ) : editingProduct ? 'Guardar Cambios' : 'Publicar Producto'}
+                 </button>
+               </div>
             </form>
           </div>
         </div>
       )}
 
-      {/* 🔥 MODAL DE DETALLES DEL PRODUCTO 🔥 */}
+      {/* 🔥 MODAL DE DETALLES DEL PEDIDO (El del Ojo) 🔥 */}
       {selectedProduct && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in">
           <div className="bg-white dark:bg-[#111] border border-zinc-200 dark:border-zinc-800 rounded-3xl shadow-2xl max-w-md w-full overflow-hidden flex flex-col relative animate-in zoom-in-95">
             
-            {/* Botón Cerrar */}
             <button 
               onClick={() => setSelectedProduct(null)} 
               className="absolute top-4 right-4 bg-black/50 text-white rounded-full p-2 hover:bg-black/70 transition-colors z-10 backdrop-blur-md"
@@ -474,7 +617,6 @@ export default function Dashboard() {
             </button>
 
             {(() => {
-              // Buscamos la info completa en la base de datos (por si el carrito no guardó la foto)
               const dbProduct = products.find(p => p.title === selectedProduct.title);
               const imageUrl = selectedProduct.image_url || dbProduct?.image_url || 'https://via.placeholder.com/400?text=Sin+Imagen';
               const description = dbProduct?.description || 'Sin descripción detallada guardada.';
