@@ -5,7 +5,7 @@ import { supabase } from '../../../lib/supabase';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 
-// --- COMPONENTE SELECTOR PREMIUM (Más compacto) ---
+// --- COMPONENTE SELECTOR PREMIUM (Anti-Saltos de Línea) ---
 const StatusSelector = ({ estadoActual, onCambiarEstado, isHistorial }: any) => {
   const [isOpen, setIsOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -35,19 +35,20 @@ const StatusSelector = ({ estadoActual, onCambiarEstado, isHistorial }: any) => 
     <div className="relative w-full" ref={menuRef}>
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="w-full flex justify-between items-center bg-white hover:bg-zinc-50 dark:bg-[#0A0A0A] dark:hover:bg-[#111] border border-zinc-200 hover:border-indigo-500 dark:border-zinc-800 dark:hover:border-indigo-500 rounded-xl px-3 py-2 text-sm font-semibold text-zinc-900 dark:text-white transition-all duration-200 shadow-sm"
+        // 🔥 whitespace-nowrap evita que el texto se rompa en dos líneas
+        className="w-full flex justify-between items-center bg-white hover:bg-zinc-50 dark:bg-[#0A0A0A] dark:hover:bg-[#111] border border-zinc-200 hover:border-indigo-500 dark:border-zinc-800 dark:hover:border-indigo-500 rounded-xl px-4 py-2.5 text-sm font-bold text-zinc-900 dark:text-white transition-all duration-200 shadow-sm whitespace-nowrap"
       >
         <div className="flex items-center gap-2">
-          <span className="text-xs">{estadoSeleccionado.icon}</span>
+          <span className="text-xs shrink-0">{estadoSeleccionado.icon}</span>
           {estadoActual}
         </div>
-        <svg className={`w-4 h-4 text-zinc-400 transition-transform duration-300 ${isOpen ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <svg className={`w-4 h-4 text-zinc-400 transition-transform duration-300 ml-2 shrink-0 ${isOpen ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
         </svg>
       </button>
 
       {isOpen && (
-        <div className="absolute top-full left-0 w-full mt-1 bg-white dark:bg-[#111] border border-zinc-200 dark:border-zinc-800 rounded-xl shadow-xl overflow-hidden z-50 animate-in fade-in zoom-in-95 duration-150">
+        <div className="absolute top-full right-0 w-full min-w-[160px] mt-1 bg-white dark:bg-[#111] border border-zinc-200 dark:border-zinc-800 rounded-xl shadow-xl overflow-hidden z-50 animate-in fade-in zoom-in-95 duration-150">
           {estadosPermitidos.map((estado) => (
             <button
               key={estado.nombre}
@@ -55,11 +56,11 @@ const StatusSelector = ({ estadoActual, onCambiarEstado, isHistorial }: any) => 
                 onCambiarEstado(estado.nombre);
                 setIsOpen(false);
               }}
-              className={`w-full flex items-center gap-2 px-3 py-2 text-sm font-medium transition-colors hover:bg-zinc-50 dark:hover:bg-zinc-800
+              className={`w-full flex items-center gap-2 px-4 py-2.5 text-sm font-semibold whitespace-nowrap transition-colors hover:bg-zinc-50 dark:hover:bg-zinc-800
                 ${estadoActual === estado.nombre ? 'bg-zinc-50 dark:bg-zinc-800 text-zinc-900 dark:text-white' : 'text-zinc-600 dark:text-zinc-400'}
               `}
             >
-              <span className="text-xs">{estado.icon}</span>
+              <span className="text-xs shrink-0">{estado.icon}</span>
               {estado.nombre}
             </button>
           ))}
@@ -73,7 +74,7 @@ const StatusSelector = ({ estadoActual, onCambiarEstado, isHistorial }: any) => 
 export default function Dashboard() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState('orders'); // Cambiado para que abra en Pedidos por defecto
+  const [activeTab, setActiveTab] = useState('orders'); 
   const [orderFilter, setOrderFilter] = useState('Pendiente'); 
 
   const [categories, setCategories] = useState<any[]>([]);
@@ -147,9 +148,9 @@ export default function Dashboard() {
   if (loading) return <div className="py-32 text-center animate-pulse text-zinc-500 font-medium text-sm">Cargando Centro de Inteligencia...</div>;
 
   return (
-    <div className="max-w-6xl mx-auto py-8 px-4">
+    // 🔥 Expandimos el ancho al 100% de la ventana de layout principal
+    <div className="w-full">
       
-      {/* Header Compacto y Elegante */}
       <div className="flex flex-col md:flex-row justify-between items-center mb-8 gap-4 bg-white dark:bg-[#111] p-6 rounded-2xl shadow-sm border border-zinc-200 dark:border-zinc-800/80">
         <div className="flex items-center gap-4">
           <div className="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center text-lg shadow-md shadow-indigo-500/20">🚀</div>
@@ -165,17 +166,14 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* --- MÓDULO 1: PEDIDOS --- */}
       {activeTab === 'orders' && (
         <div className="animate-in fade-in duration-300">
           
-          {/* Filtros con Burbujas (Badges) */}
           <div className="flex flex-wrap gap-2 mb-6 border-b border-zinc-200 dark:border-zinc-800 pb-4">
             {['Pendiente', 'En preparación', 'Enviado', 'Historial'].map((f) => {
               const cantidad = f === 'Historial' 
                 ? pedidos.filter(p => p.status === 'Entregado').length
                 : pedidos.filter(p => p.status === f).length;
-
               const isSelected = orderFilter === f;
 
               return (
@@ -189,8 +187,6 @@ export default function Dashboard() {
                   }`}
                 >
                   {f === 'Historial' ? '📦 Historial' : f}
-                  
-                  {/* La Burbuja del Contador */}
                   <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold ${
                     isSelected 
                       ? 'bg-indigo-600 text-white' 
@@ -203,45 +199,47 @@ export default function Dashboard() {
             })}
           </div>
 
-          <div className="grid grid-cols-1 gap-4">
+          <div className="flex flex-col gap-4">
             {pedidos
               .filter(p => {
                 if (orderFilter === 'Historial') return p.status === 'Entregado';
                 return p.status === orderFilter;
               })
               .map(pedido => (
-                <div key={pedido.id} className="bg-white dark:bg-[#111] p-5 rounded-2xl border border-zinc-200 dark:border-zinc-800 flex flex-col md:flex-row justify-between gap-6 hover:border-indigo-500/40 transition-colors shadow-sm">
+                // 🔥 Cambiado a sistema GRID de 12 columnas para aprovechar todo el ancho perfecto
+                <div key={pedido.id} className="bg-white dark:bg-[#111] p-5 rounded-2xl border border-zinc-200 dark:border-zinc-800 grid grid-cols-1 lg:grid-cols-12 gap-6 hover:border-indigo-500/40 transition-colors shadow-sm items-center">
                   
-                  {/* Info Cliente */}
-                  <div className="flex items-start gap-4 md:w-1/3">
-                    <div className="w-10 h-10 rounded-full bg-zinc-100 dark:bg-zinc-900 flex items-center justify-center text-lg shrink-0">👤</div>
-                    <div>
-                      <h4 className="font-bold text-sm text-zinc-900 dark:text-white leading-tight">{pedido.customer_info?.name}</h4>
-                      <p className="text-zinc-500 text-xs mt-0.5">{pedido.customer_info?.phone}</p>
+                  {/* Info Cliente - Toma 4 columnas */}
+                  <div className="lg:col-span-4 flex items-center gap-4">
+                    <div className="w-12 h-12 rounded-full bg-zinc-100 dark:bg-zinc-900 flex items-center justify-center text-xl shrink-0">👤</div>
+                    <div className="overflow-hidden">
+                      <h4 className="font-bold text-sm text-zinc-900 dark:text-white leading-tight truncate">{pedido.customer_info?.name}</h4>
+                      <p className="text-zinc-500 text-xs mt-0.5 truncate">{pedido.customer_info?.phone}</p>
                       <p className="text-zinc-400 text-[10px] mt-1 uppercase tracking-wider">{new Date(pedido.created_at).toLocaleDateString()} • {new Date(pedido.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</p>
                     </div>
                   </div>
 
-                  {/* Resumen de Productos */}
-                  <div className="bg-zinc-50 dark:bg-[#0A0A0A] p-4 rounded-xl border border-zinc-100 dark:border-zinc-800/80 md:w-1/3">
+                  {/* Resumen de Productos - Toma 5 columnas */}
+                  <div className="lg:col-span-5 bg-zinc-50 dark:bg-[#0A0A0A] p-4 rounded-xl border border-zinc-100 dark:border-zinc-800/80 w-full">
                     <p className="text-[10px] font-bold uppercase text-zinc-400 tracking-wider mb-2">Artículos</p>
                     <div className="space-y-1.5">
                       {pedido.items.map((item: any, i: number) => (
                         <p key={i} className="text-xs font-medium text-zinc-700 dark:text-zinc-300 flex items-start gap-2">
                           <span className="text-indigo-600 dark:text-indigo-400 font-bold bg-indigo-50 dark:bg-indigo-500/10 px-1.5 rounded text-[10px] shrink-0 mt-0.5">{item.cantidad}x</span> 
-                          <span className="line-clamp-2">{item.title}</span>
+                          <span className="line-clamp-1" title={item.title}>{item.title}</span>
                         </p>
                       ))}
                     </div>
                   </div>
 
-                  {/* Acciones y Total */}
-                  <div className="flex flex-col justify-between items-end gap-4 md:w-1/4">
-                    <div className="text-right w-full">
-                      <p className="text-[10px] font-bold uppercase text-zinc-400 tracking-wider mb-0.5">Total Pagado</p>
+                  {/* Acciones y Total - Toma 3 columnas (Espacio más que suficiente para no partir el texto) */}
+                  <div className="lg:col-span-3 flex lg:flex-col justify-between items-center lg:items-end gap-3 w-full">
+                    <div className="text-left lg:text-right w-full lg:w-auto">
+                      <p className="text-[10px] font-bold uppercase text-zinc-400 tracking-wider mb-0.5">Total</p>
                       <h5 className="text-xl font-black text-zinc-900 dark:text-white">${pedido.total.toLocaleString('es-CO')}</h5>
                     </div>
-                    <div className="w-full">
+                    {/* Contenedor del selector un poco más ancho */}
+                    <div className="w-48 sm:w-56 shrink-0">
                       <StatusSelector 
                         estadoActual={pedido.status} 
                         isHistorial={orderFilter === 'Historial'}
