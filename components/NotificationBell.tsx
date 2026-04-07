@@ -3,16 +3,14 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { toast } from 'sonner';
-import { useRouter } from 'next/navigation'; 
+import Link from 'next/link'; // 🔥 El superhéroe de la navegación nativa
 
 export default function NotificationBell() {
   const [notifications, setNotifications] = useState<any[]>([]);
   const [isOpen, setIsOpen] = useState(false);
   const [unread, setUnread] = useState(false);
-  const router = useRouter(); 
 
   useEffect(() => {
-    // Cargar historial al iniciar
     const saved = localStorage.getItem('veci_notifications');
     if (saved) {
       const parsed = JSON.parse(saved);
@@ -92,26 +90,17 @@ export default function NotificationBell() {
     if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate([200, 100, 200]); 
   };
 
-  // --- FUNCIÓN MEJORADA: A PRUEBA DE NOTIFICACIONES VIEJAS ---
-  const leerNotificacion = (idQueVamosABorrar: number, rutaDeDestino?: string) => {
+  // --- AHORA SOLO BORRA LA NOTIFICACIÓN, EL <Link> SE ENCARGA DEL VIAJE ---
+  const marcarComoLeida = (idQueVamosABorrar: number) => {
     const notificacionesRestantes = notifications.filter(notif => notif.id !== idQueVamosABorrar);
     
     setNotifications(notificacionesRestantes);
     localStorage.setItem('veci_notifications', JSON.stringify(notificacionesRestantes));
     
-    if (notificacionesRestantes.length === 0) {
-      setUnread(false);
-    }
-
+    if (notificacionesRestantes.length === 0) setUnread(false);
     setIsOpen(false);
-
-    // Si tiene ruta (es una notificación nueva), nos lleva. Si no tiene (es vieja), solo la borra sin romper la página.
-    if (rutaDeDestino) {
-      router.push(rutaDeDestino);
-    }
   };
 
-  // --- NUEVA FUNCIÓN: VACIAR BANDEJA ---
   const limpiarTodas = () => {
     setNotifications([]);
     localStorage.removeItem('veci_notifications');
@@ -140,7 +129,6 @@ export default function NotificationBell() {
       {isOpen && (
         <div className="absolute right-0 mt-3 w-80 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl shadow-2xl overflow-hidden">
           
-          {/* Cabecera con botón de "Limpiar" */}
           <div className="p-4 border-b border-zinc-100 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-800/50 flex justify-between items-center">
             <h4 className="font-black text-[10px] uppercase tracking-widest text-zinc-500">Notificaciones</h4>
             {notifications.length > 0 && (
@@ -161,18 +149,35 @@ export default function NotificationBell() {
               </div>
             ) : (
               notifications.map((n) => (
-                <button 
-                  key={n.id}
-                  onClick={() => leerNotificacion(n.id, n.link)} 
-                  className="w-full text-left p-5 border-b border-zinc-50 dark:border-zinc-800/50 hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-all group active:scale-95"
-                >
-                  <p className="text-sm font-bold text-zinc-800 dark:text-zinc-200 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">
-                    {n.text}
-                  </p>
-                  <p className="text-[10px] font-black tracking-widest text-zinc-400 mt-2 uppercase">
-                    {n.time} {n.link ? '• Toque para ver' : ''}
-                  </p>
-                </button>
+                // 🔥 AQUÍ ESTÁ EL TRUCO: Usamos Link para navegar y onClick solo para borrar
+                n.link ? (
+                  <Link 
+                    key={n.id}
+                    href={n.link}
+                    onClick={() => marcarComoLeida(n.id)}
+                    className="block w-full text-left p-5 border-b border-zinc-50 dark:border-zinc-800/50 hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-all group active:scale-95"
+                  >
+                    <p className="text-sm font-bold text-zinc-800 dark:text-zinc-200 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">
+                      {n.text}
+                    </p>
+                    <p className="text-[10px] font-black tracking-widest text-indigo-500 mt-2 uppercase flex items-center gap-1">
+                      {n.time} <span>→ Toca para ir</span>
+                    </p>
+                  </Link>
+                ) : (
+                  <button 
+                    key={n.id}
+                    onClick={() => marcarComoLeida(n.id)}
+                    className="block w-full text-left p-5 border-b border-zinc-50 dark:border-zinc-800/50 hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-all group active:scale-95"
+                  >
+                    <p className="text-sm font-bold text-zinc-800 dark:text-zinc-200 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">
+                      {n.text}
+                    </p>
+                    <p className="text-[10px] font-black tracking-widest text-zinc-400 mt-2 uppercase">
+                      {n.time}
+                    </p>
+                  </button>
+                )
               ))
             )}
           </div>
