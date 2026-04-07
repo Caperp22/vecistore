@@ -3,7 +3,7 @@
 import { useEffect, useState, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 import { toast } from 'sonner';
-import { useRouter, usePathname } from 'next/navigation'; // Importamos usePathname
+import { useRouter, usePathname } from 'next/navigation';
 
 export default function NotificationBell() {
   const [notifications, setNotifications] = useState<any[]>([]);
@@ -11,10 +11,11 @@ export default function NotificationBell() {
   const [unread, setUnread] = useState(false);
   
   const router = useRouter(); 
-  const pathname = usePathname(); // 📍 Esto nos dice en qué página estamos parados
+  const pathname = usePathname(); 
   const channelRef = useRef<any>(null);
 
   useEffect(() => {
+    // 1. Cargar historial
     const saved = localStorage.getItem('veci_notifications');
     if (saved) {
       const parsed = JSON.parse(saved);
@@ -29,20 +30,20 @@ export default function NotificationBell() {
       const myId = session.user.id;
       const isAdmin = session.user.email === 'caperp22@gmail.com';
 
+      // 2. Limpiar conexiones viejas
       if (channelRef.current) {
         await supabase.removeChannel(channelRef.current);
       }
 
-      const uniqueChannelName = isAdmin 
-        ? `admin-channel-${Date.now()}` 
-        : `client-${myId}-${Date.now()}`;
-
-      const newChannel = supabase.channel(uniqueChannelName);
+      // 3. Crear canal único
+      const newChannel = supabase.channel(`notifs-${myId}-${Date.now()}`);
       channelRef.current = newChannel;
 
       if (isAdmin) {
         newChannel
           .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'orders' }, () => {
+             // ¡AGREGADO: Mensaje flotante para el Admin!
+             toast.success('🛒 ¡Nuevo pedido recibido!'); 
              addNotification('🛒 ¡Nuevo pedido recibido!', '/admin/dashboard');
           })
           .subscribe();
@@ -55,12 +56,13 @@ export default function NotificationBell() {
               filter: `user_id=eq.${myId}` 
             }, (payload) => {
               const nuevoEstado = payload.new.status;
+              // Mensaje flotante para el Cliente
               toast.success(`Tu pedido ahora está: ${nuevoEstado}`); 
               addNotification(`📦 Tu pedido cambió a: ${nuevoEstado}`, '/perfil');
           })
           .subscribe((status) => {
             if (status === 'CLOSED' || status === 'CHANNEL_ERROR') {
-              setTimeout(setupRealtime, 2000);
+              setTimeout(setupRealtime, 2000); // Autoreconexión
             }
           });
       }
@@ -70,10 +72,9 @@ export default function NotificationBell() {
 
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible') {
-        setTimeout(() => setupRealtime(), 1000);
+        setTimeout(setupRealtime, 1000);
       }
     };
-    
     document.addEventListener('visibilitychange', handleVisibilityChange);
 
     return () => {
@@ -105,22 +106,17 @@ export default function NotificationBell() {
     if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate([200, 100, 200]); 
   };
 
-  // --- 🔥 FUNCIÓN MAESTRA DE NAVEGACIÓN ---
   const manejarClicNotificacion = (idQueVamosABorrar: number, rutaDeDestino?: string) => {
-    // 1. Limpiamos la notificación
     const notificacionesRestantes = notifications.filter(notif => notif.id !== idQueVamosABorrar);
     setNotifications(notificacionesRestantes);
     localStorage.setItem('veci_notifications', JSON.stringify(notificacionesRestantes));
     if (notificacionesRestantes.length === 0) setUnread(false);
     setIsOpen(false);
 
-    // 2. Lógica inteligente de viaje
     if (rutaDeDestino) {
       if (pathname === rutaDeDestino) {
-        // Si YA ESTAMOS en la página, forzamos una recarga real para traer los nuevos datos
         window.location.reload(); 
       } else {
-        // Si estamos en OTRA página, viajamos hacia allá suavemente
         router.push(rutaDeDestino);
       }
     }
@@ -152,16 +148,16 @@ export default function NotificationBell() {
       </button>
 
       {isOpen && (
-        <div className="absolute right-0 mt-3 w-80 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl shadow-2xl overflow-hidden">
+        <div className="absolute right-0 mt-3 w-[22rem] bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl shadow-2xl overflow-hidden">
           
           <div className="p-4 border-b border-zinc-100 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-800/50 flex justify-between items-center">
             <h4 className="font-black text-[10px] uppercase tracking-widest text-zinc-500">Notificaciones</h4>
             {notifications.length > 0 && (
               <button 
                 onClick={limpiarTodas}
-                className="text-[10px] font-black text-red-500 hover:text-red-700 uppercase tracking-wider bg-red-50 dark:bg-red-500/10 px-2 py-1 rounded-lg transition-colors"
+                className="text-[10px] font-black text-red-500 hover:text-red-700 uppercase tracking-wider bg-red-50 dark:bg-red-500/10 px-3 py-1.5 rounded-lg transition-colors active:scale-95"
               >
-                Limpiar todas
+                Limpiar
               </button>
             )}
           </div>
@@ -169,7 +165,7 @@ export default function NotificationBell() {
           <div className="max-h-[60vh] overflow-y-auto">
             {notifications.length === 0 ? (
               <div className="p-10 text-center flex flex-col items-center justify-center">
-                <span className="text-3xl mb-3 opacity-50">📭</span>
+                <span className="text-4xl mb-3 opacity-50">📭</span>
                 <p className="text-zinc-500 font-medium text-sm">Bandeja vacía</p>
               </div>
             ) : (
@@ -177,14 +173,25 @@ export default function NotificationBell() {
                 <button 
                   key={n.id}
                   onClick={() => manejarClicNotificacion(n.id, n.link)}
-                  className="block w-full text-left p-5 border-b border-zinc-50 dark:border-zinc-800/50 hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-all group active:scale-95"
+                  className="w-full text-left p-5 border-b border-zinc-50 dark:border-zinc-800/50 hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-all group active:scale-95"
                 >
-                  <p className="text-sm font-bold text-zinc-800 dark:text-zinc-200 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">
-                    {n.text}
-                  </p>
-                  <p className="text-[10px] font-black tracking-widest text-indigo-500 mt-2 uppercase flex items-center gap-1">
-                    {n.time} {n.link && <span>→ Toca para ir</span>}
-                  </p>
+                  <div className="flex justify-between items-center gap-4">
+                    <div>
+                      <p className="text-sm font-bold text-zinc-800 dark:text-zinc-200 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">
+                        {n.text}
+                      </p>
+                      <p className="text-[10px] font-black tracking-widest text-zinc-400 mt-2 uppercase">
+                        {n.time}
+                      </p>
+                    </div>
+                    
+                    {/* BOTÓN VISUAL: Solo se muestra si la notificación es "nueva" y tiene link */}
+                    {n.link && (
+                      <span className="shrink-0 bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 text-[10px] font-black px-3 py-1.5 rounded-full uppercase tracking-wider group-hover:bg-indigo-100 dark:group-hover:bg-indigo-500/20 transition-colors shadow-sm">
+                        Ir ➔
+                      </span>
+                    )}
+                  </div>
                 </button>
               ))
             )}
