@@ -3,14 +3,15 @@
 import { useEffect, useState, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 import { toast } from 'sonner';
-import Link from 'next/link'; 
+import { useRouter, usePathname } from 'next/navigation'; // Importamos usePathname
 
 export default function NotificationBell() {
   const [notifications, setNotifications] = useState<any[]>([]);
   const [isOpen, setIsOpen] = useState(false);
   const [unread, setUnread] = useState(false);
   
-  // Guardamos el canal en una referencia para poder matarlo y revivirlo sin errores
+  const router = useRouter(); 
+  const pathname = usePathname(); // 📍 Esto nos dice en qué página estamos parados
   const channelRef = useRef<any>(null);
 
   useEffect(() => {
@@ -28,13 +29,10 @@ export default function NotificationBell() {
       const myId = session.user.id;
       const isAdmin = session.user.email === 'caperp22@gmail.com';
 
-      // 1. Matamos cualquier conexión "zombi" anterior antes de crear una nueva
       if (channelRef.current) {
         await supabase.removeChannel(channelRef.current);
       }
 
-      // 2. CREAMOS UN CANAL ÚNICO usando la hora exacta. 
-      // Esto fuerza a Supabase y al celular a abrir una tubería 100% nueva.
       const uniqueChannelName = isAdmin 
         ? `admin-channel-${Date.now()}` 
         : `client-${myId}-${Date.now()}`;
@@ -61,9 +59,7 @@ export default function NotificationBell() {
               addNotification(`📦 Tu pedido cambió a: ${nuevoEstado}`, '/perfil');
           })
           .subscribe((status) => {
-            // 3. EL DESFIBRILADOR: Si la conexión se cae o da error, la reiniciamos sola en 2 segundos
             if (status === 'CLOSED' || status === 'CHANNEL_ERROR') {
-              console.log("Conexión perdida por el celular. Reconectando...");
               setTimeout(setupRealtime, 2000);
             }
           });
@@ -72,13 +68,9 @@ export default function NotificationBell() {
 
     setupRealtime();
 
-    // 4. Reconexión inteligente al desbloquear el celular
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible') {
-        // Le damos 1 segundo al celular para que despierte su antena WiFi/4G antes de reconectar
-        setTimeout(() => {
-          setupRealtime();
-        }, 1000);
+        setTimeout(() => setupRealtime(), 1000);
       }
     };
     
@@ -113,12 +105,25 @@ export default function NotificationBell() {
     if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate([200, 100, 200]); 
   };
 
-  const marcarComoLeida = (idQueVamosABorrar: number) => {
+  // --- 🔥 FUNCIÓN MAESTRA DE NAVEGACIÓN ---
+  const manejarClicNotificacion = (idQueVamosABorrar: number, rutaDeDestino?: string) => {
+    // 1. Limpiamos la notificación
     const notificacionesRestantes = notifications.filter(notif => notif.id !== idQueVamosABorrar);
     setNotifications(notificacionesRestantes);
     localStorage.setItem('veci_notifications', JSON.stringify(notificacionesRestantes));
     if (notificacionesRestantes.length === 0) setUnread(false);
     setIsOpen(false);
+
+    // 2. Lógica inteligente de viaje
+    if (rutaDeDestino) {
+      if (pathname === rutaDeDestino) {
+        // Si YA ESTAMOS en la página, forzamos una recarga real para traer los nuevos datos
+        window.location.reload(); 
+      } else {
+        // Si estamos en OTRA página, viajamos hacia allá suavemente
+        router.push(rutaDeDestino);
+      }
+    }
   };
 
   const limpiarTodas = () => {
@@ -169,34 +174,18 @@ export default function NotificationBell() {
               </div>
             ) : (
               notifications.map((n) => (
-                n.link ? (
-                  <Link 
-                    key={n.id}
-                    href={n.link}
-                    onClick={() => marcarComoLeida(n.id)}
-                    className="block w-full text-left p-5 border-b border-zinc-50 dark:border-zinc-800/50 hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-all group active:scale-95"
-                  >
-                    <p className="text-sm font-bold text-zinc-800 dark:text-zinc-200 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">
-                      {n.text}
-                    </p>
-                    <p className="text-[10px] font-black tracking-widest text-indigo-500 mt-2 uppercase flex items-center gap-1">
-                      {n.time} <span>→ Toca para ir</span>
-                    </p>
-                  </Link>
-                ) : (
-                  <button 
-                    key={n.id}
-                    onClick={() => marcarComoLeida(n.id)}
-                    className="block w-full text-left p-5 border-b border-zinc-50 dark:border-zinc-800/50 hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-all group active:scale-95"
-                  >
-                    <p className="text-sm font-bold text-zinc-800 dark:text-zinc-200 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">
-                      {n.text}
-                    </p>
-                    <p className="text-[10px] font-black tracking-widest text-zinc-400 mt-2 uppercase">
-                      {n.time}
-                    </p>
-                  </button>
-                )
+                <button 
+                  key={n.id}
+                  onClick={() => manejarClicNotificacion(n.id, n.link)}
+                  className="block w-full text-left p-5 border-b border-zinc-50 dark:border-zinc-800/50 hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-all group active:scale-95"
+                >
+                  <p className="text-sm font-bold text-zinc-800 dark:text-zinc-200 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">
+                    {n.text}
+                  </p>
+                  <p className="text-[10px] font-black tracking-widest text-indigo-500 mt-2 uppercase flex items-center gap-1">
+                    {n.time} {n.link && <span>→ Toca para ir</span>}
+                  </p>
+                </button>
               ))
             )}
           </div>
