@@ -42,7 +42,6 @@ export default function NotificationBell() {
       if (isAdmin) {
         newChannel
           .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'orders' }, () => {
-             // ¡AGREGADO: Mensaje flotante para el Admin!
              toast.success('🛒 ¡Nuevo pedido recibido!'); 
              addNotification('🛒 ¡Nuevo pedido recibido!', '/admin/dashboard');
           })
@@ -56,7 +55,6 @@ export default function NotificationBell() {
               filter: `user_id=eq.${myId}` 
             }, (payload) => {
               const nuevoEstado = payload.new.status;
-              // Mensaje flotante para el Cliente
               toast.success(`Tu pedido ahora está: ${nuevoEstado}`); 
               addNotification(`📦 Tu pedido cambió a: ${nuevoEstado}`, '/perfil');
           })
@@ -148,7 +146,8 @@ export default function NotificationBell() {
       </button>
 
       {isOpen && (
-        <div className="absolute right-0 mt-3 w-[calc(100vw-2rem)] sm:w-80 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl shadow-2xl z-50 overflow-hidden">
+        {/* 🔥 AQUÍ ESTÁ EL ARREGLO RESPONSIVO: -right-4 y w-[90vw] para celulares */}
+        <div className="absolute -right-4 sm:right-0 mt-4 w-[90vw] sm:w-[22rem] bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl shadow-2xl z-50 overflow-hidden">
           
           <div className="p-4 border-b border-zinc-100 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-800/50 flex justify-between items-center">
             <h4 className="font-black text-[10px] uppercase tracking-widest text-zinc-500">Notificaciones</h4>
@@ -185,7 +184,6 @@ export default function NotificationBell() {
                       </p>
                     </div>
                     
-                    {/* BOTÓN VISUAL: Solo se muestra si la notificación es "nueva" y tiene link */}
                     {n.link && (
                       <span className="shrink-0 bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 text-[10px] font-black px-3 py-1.5 rounded-full uppercase tracking-wider group-hover:bg-indigo-100 dark:group-hover:bg-indigo-500/20 transition-colors shadow-sm">
                         Ir ➔
