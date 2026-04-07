@@ -17,24 +17,23 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
   const router = useRouter();
 
   useEffect(() => {
-    // Escuchar cambios en la sesión (Login, Logout, Refresh)
-    const { data: { subscription } } = supabase.auth.onAuthStateChanged((event, session) => {
-      console.log("Evento de Auth:", event);
-      
-      if (event === 'SIGNED_OUT') {
-        // Limpiar datos locales si se cierra sesión
-        localStorage.removeItem('veci_notifications');
-        router.refresh(); // Refrescar para limpiar estados de servidor
-      }
-      
-      if (event === 'INITIAL_SESSION' || event === 'SIGNED_IN') {
-        // La sesión se recuperó con éxito
-        console.log("Sesión activa para:", session?.user.email);
-      }
-    });
+      // 1. Cambiamos a onAuthStateChange (sin la "d" final)
+      // Al hacer esto, TypeScript ya reconoce automáticamente qué son "event" y "session"
+      const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+        console.log("Evento de Auth:", event);
+        
+        if (event === 'SIGNED_OUT') {
+          localStorage.removeItem('veci_notifications');
+          router.refresh(); 
+        }
+        
+        if (event === 'INITIAL_SESSION' || event === 'SIGNED_IN') {
+          console.log("Sesión activa para:", session?.user?.email);
+        }
+      });
 
-    return () => subscription.unsubscribe();
-  }, [router]);
+      return () => subscription.unsubscribe();
+    }, [router]);
 
   return (
     <html lang="es" suppressHydrationWarning>
@@ -46,7 +45,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
             
             <Navbar />
             
-            <main className="flex-grow w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12 flex flex-col">
+            <main className="grow w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12 flex flex-col">
               {children}
             </main>
 
