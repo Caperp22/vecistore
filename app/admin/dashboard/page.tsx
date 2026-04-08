@@ -5,7 +5,7 @@ import { supabase } from '../../../lib/supabase';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 
-// 🔥 DICCIONARIO DE SUBCATEGORÍAS (Puedes editar estos nombres a tu gusto)
+// 🔥 DICCIONARIO DE SUBCATEGORÍAS
 const SUBCATEGORIAS_MAP: Record<string, string[]> = {
   'Amigurumis': ['Personajes', 'Animales', 'Llaveros', 'Gorros', 'Personalizados', 'Otros'],
   'Impresión 3D': ['Figuras', 'Macetas', 'Mecánicos', 'Accesorios', 'Repuestos', 'Otros'],
@@ -81,10 +81,9 @@ const StatusSelector = ({ estadoActual, onCambiarEstado, isHistorial }: any) => 
 export default function Dashboard() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState('products'); // Lo puse por defecto en Inventario para que lo pruebes de una vez
+  const [activeTab, setActiveTab] = useState('orders'); 
   const [orderFilter, setOrderFilter] = useState('Pendiente'); 
 
-  // ESTADOS DE FILTROS PARA EL INVENTARIO
   const [inventoryCatFilter, setInventoryCatFilter] = useState('Todas');
   const [inventorySubcatFilter, setInventorySubcatFilter] = useState('Todas');
 
@@ -96,12 +95,11 @@ export default function Dashboard() {
   const [pedidos, setPedidos] = useState<any[]>([]);
   const [products, setProducts] = useState<any[]>([]);
 
-  // ESTADOS DEL FORMULARIO DE PRODUCTO
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [price, setPrice] = useState('');
   const [categoryId, setCategoryId] = useState('');
-  const [subcategory, setSubcategory] = useState(''); // 🔥 NUEVO CAMPO
+  const [subcategory, setSubcategory] = useState(''); 
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
 
@@ -178,7 +176,6 @@ export default function Dashboard() {
     } catch (e: any) { toast.error(e.message); }
   };
 
-  // 🔥 LÓGICA DE GESTIÓN DE INVENTARIO
   const openNewProductModal = () => {
     setEditingProduct(null);
     setTitle(''); setPrice(''); setCategoryId(''); setSubcategory(''); setDescription(''); setImageFile(null);
@@ -190,7 +187,7 @@ export default function Dashboard() {
     setTitle(producto.title); 
     setPrice(producto.price.toString()); 
     setCategoryId(producto.category_id?.toString() || ''); 
-    setSubcategory(producto.subcategory || ''); // Carga la subcategoría guardada
+    setSubcategory(producto.subcategory || ''); 
     setDescription(producto.description); 
     setImageFile(null); 
     setIsInventoryModalOpen(true);
@@ -230,7 +227,7 @@ export default function Dashboard() {
         description,
         price: parseInt(price),
         category_id: parseInt(categoryId),
-        subcategory, // 🔥 Se guarda en la DB
+        subcategory, 
         image_url: finalImageUrl
       };
 
@@ -256,14 +253,12 @@ export default function Dashboard() {
     }
   };
 
-  // 🔥 LÓGICA DE FILTRADO PARA EL CATÁLOGO DE INVENTARIO
   const filteredProducts = products.filter(p => {
     const matchesCat = inventoryCatFilter === 'Todas' || p.categories?.name === inventoryCatFilter;
     const matchesSubcat = inventorySubcatFilter === 'Todas' || p.subcategory === inventorySubcatFilter;
     return matchesCat && matchesSubcat;
   });
 
-  // Saber qué nombre de categoría está seleccionada en el Formulario para mostrar sus subcategorías
   const selectedCategoryNameForm = categories.find(c => c.id.toString() === categoryId)?.name || '';
   const availableSubcategoriesForm = selectedCategoryNameForm ? SUBCATEGORIAS_MAP[selectedCategoryNameForm] || [] : [];
 
@@ -360,17 +355,30 @@ export default function Dashboard() {
                     </div>
                   </div>
 
+                  {/* 🔥 MODIFICACIÓN: Si está Entregado, muestra Etiqueta. Si no, Selector 🔥 */}
                   <div className="lg:col-span-3 flex lg:flex-col justify-between items-center lg:items-end gap-3 w-full">
                     <div className="text-left lg:text-right w-full lg:w-auto">
                       <p className="text-[10px] font-bold uppercase text-zinc-400 tracking-wider mb-0.5">Total</p>
                       <h5 className="text-xl font-black text-zinc-900 dark:text-white">${pedido.total.toLocaleString('es-CO')}</h5>
                     </div>
                     <div className="w-48 sm:w-56 shrink-0">
-                      <StatusSelector 
-                        estadoActual={pedido.status} 
-                        isHistorial={orderFilter === 'Historial'}
-                        onCambiarEstado={(nuevoEstado: string) => updateOrderStatus(pedido.id, nuevoEstado)}
-                      />
+                      {pedido.status === 'Entregado' ? (
+                        <div className="w-full flex justify-between items-center bg-green-50 dark:bg-green-500/10 border border-green-200 dark:border-green-500/20 rounded-xl px-4 py-2.5 text-sm font-bold text-green-700 dark:text-green-400 shadow-sm cursor-default">
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs shrink-0">🟢</span>
+                            Entregado
+                          </div>
+                          <svg className="w-4 h-4 opacity-70" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                          </svg>
+                        </div>
+                      ) : (
+                        <StatusSelector 
+                          estadoActual={pedido.status} 
+                          isHistorial={orderFilter === 'Historial'}
+                          onCambiarEstado={(nuevoEstado: string) => updateOrderStatus(pedido.id, nuevoEstado)}
+                        />
+                      )}
                     </div>
                   </div>
 
@@ -499,7 +507,7 @@ export default function Dashboard() {
         </div>
       )}
 
-      {/* --- MÓDULO 3: GESTIÓN DE INVENTARIO (CON SUBCATEGORÍAS) --- */}
+      {/* --- MÓDULO 3: GESTIÓN DE INVENTARIO --- */}
       {activeTab === 'products' && (
         <div className="animate-in fade-in duration-300">
           
@@ -516,7 +524,6 @@ export default function Dashboard() {
             </button>
           </div>
 
-          {/* 🔥 BARRA DE FILTROS INTELIGENTE 🔥 */}
           <div className="bg-white dark:bg-[#111] p-4 rounded-2xl border border-zinc-200 dark:border-zinc-800 flex flex-col sm:flex-row gap-4 mb-6 shadow-sm">
             <div className="flex-1">
               <label className="text-[10px] font-bold uppercase text-zinc-400 tracking-widest mb-2 block">Filtrar por Categoría</label>
@@ -535,7 +542,6 @@ export default function Dashboard() {
               </div>
             </div>
 
-            {/* Sub-filtros condicionales */}
             {inventoryCatFilter !== 'Todas' && SUBCATEGORIAS_MAP[inventoryCatFilter] && (
               <div className="flex-1 border-t sm:border-t-0 sm:border-l border-zinc-200 dark:border-zinc-800 pt-4 sm:pt-0 sm:pl-4">
                 <label className="text-[10px] font-bold uppercase text-zinc-400 tracking-widest mb-2 block">Subcategorías de {inventoryCatFilter}</label>
@@ -556,7 +562,6 @@ export default function Dashboard() {
             )}
           </div>
 
-          {/* Cuadrícula de Productos Filtrada */}
           {filteredProducts.length === 0 ? (
             <div className="text-center py-20 bg-white dark:bg-[#111] rounded-2xl border border-dashed border-zinc-200 dark:border-zinc-800">
               <span className="text-4xl opacity-50 mb-3 block">👻</span>
@@ -614,7 +619,7 @@ export default function Dashboard() {
         </div>
       )}
 
-      {/* 🔥 MODAL PARA AÑADIR / EDITAR PRODUCTO (CON DROPDOWN DEPENDIENTE) 🔥 */}
+      {/* 🔥 MODAL PARA AÑADIR / EDITAR PRODUCTO 🔥 */}
       {isInventoryModalOpen && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in">
           <div className="bg-white dark:bg-[#111] border border-zinc-200 dark:border-zinc-800 rounded-3xl shadow-2xl max-w-lg w-full overflow-hidden flex flex-col relative animate-in zoom-in-95">
@@ -635,12 +640,11 @@ export default function Dashboard() {
                </div>
 
                <div className="grid grid-cols-2 gap-4">
-                 {/* Categoría Principal */}
                  <select 
                    value={categoryId} 
                    onChange={e => {
                      setCategoryId(e.target.value);
-                     setSubcategory(''); // Reseteamos la subcategoría si cambia la categoría principal
+                     setSubcategory(''); 
                    }} 
                    className="w-full p-3 text-sm bg-zinc-50 dark:bg-[#0A0A0A] rounded-xl outline-none border border-zinc-200 dark:border-zinc-800 focus:border-indigo-500 transition-colors text-zinc-700 dark:text-zinc-300" required
                  >
@@ -648,7 +652,6 @@ export default function Dashboard() {
                     {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                  </select>
 
-                 {/* Subcategoría Dependiente */}
                  <select 
                    value={subcategory} 
                    onChange={e => setSubcategory(e.target.value)} 
@@ -689,7 +692,7 @@ export default function Dashboard() {
         </div>
       )}
 
-      {/* 🔥 MODAL DE DETALLES DEL PEDIDO (El del Ojo) 🔥 */}
+      {/* 🔥 MODAL DE DETALLES DEL PEDIDO 🔥 */}
       {selectedProduct && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in">
           <div className="bg-white dark:bg-[#111] border border-zinc-200 dark:border-zinc-800 rounded-3xl shadow-2xl max-w-md w-full overflow-hidden flex flex-col relative animate-in zoom-in-95">
