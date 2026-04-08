@@ -6,9 +6,9 @@ import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 
 // Importamos los componentes que acabamos de crear
-import OrdersTab from '../../../components/admin/OrdersTab';
-import MetricsTab from '../../../components/admin/MetricsTab';
-import InventoryTab from '../../../components/admin/InventoryTab';
+import OrdersTab from '@/components/admin/OrdersTab';
+import MetricsTab from '@/components/admin/MetricsTab';
+import InventoryTab from '@/components/admin/InventoryTab';
 
 export default function Dashboard() {
   const router = useRouter();
