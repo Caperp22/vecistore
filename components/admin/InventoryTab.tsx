@@ -4,14 +4,8 @@ import { useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import { toast } from 'sonner';
 
-const SUBCATEGORIAS_MAP: Record<string, string[]> = {
-  'Amigurumis': ['Personajes', 'Animales', 'Llaveros', 'Gorros', 'Personalizados', 'Otros'],
-  'Impresión 3D': ['Figuras', 'Macetas', 'Mecánicos', 'Accesorios', 'Repuestos', 'Otros'],
-  'Manualidades': ['Resina', 'Papelería', 'Arcilla', 'Tela', 'Pintura', 'Otros'],
-  'Hama Beads': ['Llaveros', 'Imanes', 'Cuadros', 'Posavasos', 'Figuras', 'Otros']
-};
-
-export default function InventoryTab({ products, setProducts, categories }: { products: any[], setProducts: any, categories: any[] }) {
+// 🔥 1. RECIBIMOS LA NUEVA PROP "subcategories"
+export default function InventoryTab({ products, setProducts, categories, subcategories }: { products: any[], setProducts: any, categories: any[], subcategories: any[] }) {
   const [inventoryCatFilter, setInventoryCatFilter] = useState('Todas');
   const [inventorySubcatFilter, setInventorySubcatFilter] = useState('Todas');
   const [isInventoryModalOpen, setIsInventoryModalOpen] = useState(false);
@@ -108,8 +102,17 @@ export default function InventoryTab({ products, setProducts, categories }: { pr
     return matchesCat && matchesSubcat;
   });
 
-  const selectedCategoryNameForm = categories.find(c => c.id.toString() === categoryId)?.name || '';
-  const availableSubcategoriesForm = selectedCategoryNameForm ? SUBCATEGORIAS_MAP[selectedCategoryNameForm] || [] : [];
+  // 🔥 2. LÓGICA DINÁMICA: Obtenemos el ID de la categoría seleccionada en los filtros
+  const selectedCatIdForFilter = categories.find(c => c.name === inventoryCatFilter)?.id;
+  // Filtramos las subcategorías que pertenecen a esa categoría
+  const subcategoriasDelFiltro = selectedCatIdForFilter 
+    ? subcategories.filter(sub => sub.category_id === selectedCatIdForFilter) 
+    : [];
+
+  // 🔥 3. LÓGICA DINÁMICA (Para el Formulario)
+  const availableSubcategoriesForm = categoryId 
+    ? subcategories.filter(sub => sub.category_id.toString() === categoryId) 
+    : [];
 
   return (
     <div className="animate-in fade-in duration-300">
@@ -127,6 +130,7 @@ export default function InventoryTab({ products, setProducts, categories }: { pr
         </button>
       </div>
 
+      {/* BARRA DE FILTROS */}
       <div className="bg-white dark:bg-[#111] p-4 rounded-2xl border border-zinc-200 dark:border-zinc-800 flex flex-col sm:flex-row gap-4 mb-6 shadow-sm">
         <div className="flex-1">
           <label className="text-[10px] font-bold uppercase text-zinc-400 tracking-widest mb-2 block">Filtrar por Categoría</label>
@@ -145,7 +149,8 @@ export default function InventoryTab({ products, setProducts, categories }: { pr
           </div>
         </div>
 
-        {inventoryCatFilter !== 'Todas' && SUBCATEGORIAS_MAP[inventoryCatFilter] && (
+        {/* 🔥 4. RENDERIZADO DINÁMICO DE LOS BOTONES DE FILTRO 🔥 */}
+        {inventoryCatFilter !== 'Todas' && subcategoriasDelFiltro.length > 0 && (
           <div className="flex-1 border-t sm:border-t-0 sm:border-l border-zinc-200 dark:border-zinc-800 pt-4 sm:pt-0 sm:pl-4">
             <label className="text-[10px] font-bold uppercase text-zinc-400 tracking-widest mb-2 block">Subcategorías de {inventoryCatFilter}</label>
             <div className="flex flex-wrap gap-2">
@@ -153,12 +158,12 @@ export default function InventoryTab({ products, setProducts, categories }: { pr
                 onClick={() => setInventorySubcatFilter('Todas')}
                 className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all border ${inventorySubcatFilter === 'Todas' ? 'border-indigo-500 text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-500/10' : 'border-transparent bg-zinc-50 dark:bg-zinc-900 text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-800'}`}
               >Todas</button>
-              {SUBCATEGORIAS_MAP[inventoryCatFilter].map(sub => (
+              {subcategoriasDelFiltro.map((sub: any) => (
                 <button 
-                  key={sub}
-                  onClick={() => setInventorySubcatFilter(sub)}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all border ${inventorySubcatFilter === sub ? 'border-indigo-500 text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-500/10' : 'border-transparent bg-zinc-50 dark:bg-zinc-900 text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-800'}`}
-                >{sub}</button>
+                  key={sub.id}
+                  onClick={() => setInventorySubcatFilter(sub.name)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all border ${inventorySubcatFilter === sub.name ? 'border-indigo-500 text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-500/10' : 'border-transparent bg-zinc-50 dark:bg-zinc-900 text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-800'}`}
+                >{sub.name}</button>
               ))}
             </div>
           </div>
@@ -252,6 +257,7 @@ export default function InventoryTab({ products, setProducts, categories }: { pr
                     {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                  </select>
 
+                 {/* 🔥 5. RENDERIZADO DINÁMICO DE SUBCATEGORÍAS EN EL FORMULARIO 🔥 */}
                  <select 
                    value={subcategory} 
                    onChange={e => setSubcategory(e.target.value)} 
@@ -259,7 +265,7 @@ export default function InventoryTab({ products, setProducts, categories }: { pr
                    className="w-full p-3 text-sm bg-zinc-50 dark:bg-[#0A0A0A] rounded-xl outline-none border border-zinc-200 dark:border-zinc-800 focus:border-indigo-500 transition-colors text-zinc-700 dark:text-zinc-300 disabled:opacity-50 disabled:cursor-not-allowed" required
                  >
                     <option value="">Subcategoría...</option>
-                    {availableSubcategoriesForm.map((sub: string) => <option key={sub} value={sub}>{sub}</option>)}
+                    {availableSubcategoriesForm.map((sub: any) => <option key={sub.id} value={sub.name}>{sub.name}</option>)}
                  </select>
                </div>
 
