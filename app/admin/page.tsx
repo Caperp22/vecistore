@@ -1,110 +1,131 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useRouter } from 'next/navigation';
+import { toast } from 'sonner';
 
-export default function AdminLogin() {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [error, setError] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(false); // Le añadimos un estado de carga visual
+import OrdersTab from '@/components/admin/OrdersTab';
+import MetricsTab from '@/components/admin/MetricsTab';
+import InventoryTab from '@/components/admin/InventoryTab';
+import CategoriesTab from '@/components/admin/CategoriesTab';
+import SubcategoriesTab from '@/components/admin/SubcategoriesTab';
+// 🔥 1. Importamos tu nuevo componente
+import WhatsappTab from '@/components/admin/WhatsappTab'; 
+
+export default function Dashboard() {
   const router = useRouter();
+  const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState('orders'); 
 
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError(null);
-    setIsLoading(true); // El botón dirá "Autenticando..."
+  const [categories, setCategories] = useState<any[]>([]);
+  const [subcategories, setSubcategories] = useState<any[]>([]); 
+  const [pedidos, setPedidos] = useState<any[]>([]);
+  const [products, setProducts] = useState<any[]>([]);
+  
+  // 🔥 2. Nuevo estado para guardar las plantillas de WhatsApp
+  const [waTemplates, setWaTemplates] = useState<any[]>([]); 
 
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
+  useEffect(() => {
+    const fetchAdminData = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session || session.user.email !== 'caperp22@gmail.com') {
+        router.push('/');
+        return;
+      }
 
-    if (error) {
-      setError('Credenciales incorrectas. Intenta de nuevo.');
-      setIsLoading(false);
-    } else {
-      router.push('/admin/dashboard'); 
+      // 🔥 Agregamos la consulta de whatsapp_templates
+      const [catsRes, subcatsRes, ordersRes, prodRes, waRes] = await Promise.all([
+        supabase.from('categories').select('*').order('id', { ascending: true }),
+        supabase.from('subcategories').select('*').order('name', { ascending: true }),
+        supabase.from('orders').select('*').order('created_at', { ascending: false }),
+        supabase.from('products').select('*, categories(name)').order('created_at', { ascending: false }),
+        supabase.from('whatsapp_templates').select('*') 
+      ]);
+
+      if (catsRes.data) setCategories(catsRes.data);
+      if (subcatsRes.data) setSubcategories(subcatsRes.data);
+      if (ordersRes.data) setPedidos(ordersRes.data);
+      if (prodRes.data) setProducts(prodRes.data);
+      if (waRes.data) setWaTemplates(waRes.data);
+      
+      setLoading(false);
+    };
+
+    fetchAdminData();
+
+    const channel = supabase.channel('admin-realtime')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'orders' }, () => {
+        toast.success('¡Nuevo pedido recibido! 🛍️');
+        fetchAdminData();
+      })
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'orders' }, () => fetchAdminData())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'products' }, () => fetchAdminData())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'categories' }, () => fetchAdminData())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'subcategories' }, () => fetchAdminData())
+      // 🔥 Opcional: Escuchar también si cambias los mensajes en otra pestaña
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'whatsapp_templates' }, () => fetchAdminData())
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
+  }, [router]);
+
+  const updateOrderStatus = async (orderId: string, newStatus: string, customerPhone?: string, customerName?: string) => {
+    try {
+      const { error } = await supabase.from('orders').update({ status: newStatus, updated_at: new Date().toISOString() }).eq('id', orderId);
+      if (error) throw error;
+
+      setPedidos(prev => prev.map(p => p.id === orderId ? { ...p, status: newStatus, updated_at: new Date().toISOString() } : p));
+      toast.success(`Pedido movido a ${newStatus}`);
+
+      // 🔥 3. USAR LAS PLANTILLAS DE LA BASE DE DATOS
+      const templateRecord = waTemplates.find(t => t.status === newStatus);
+      
+      if (customerPhone && templateRecord) {
+        // Reemplazamos el comodín [CLIENTE] por el nombre real
+        const mensajeFinal = templateRecord.message.replace(/\[CLIENTE\]/g, customerName || 'Cliente');
+        
+        const url = `https://wa.me/${customerPhone}?text=${encodeURIComponent(mensajeFinal)}`;
+        window.open(url, '_blank');
+      }
+
+    } catch (e: any) { 
+      toast.error(e.message); 
     }
   };
 
+  if (loading) return <div className="py-32 text-center animate-pulse text-zinc-500 font-medium text-sm">Cargando Centro de Inteligencia...</div>;
+
   return (
-    <div className="flex justify-center items-center min-h-[80vh] px-4">
-      {/* TARJETA DE LOGIN PREMIUM */}
-      <div className="bg-white dark:bg-[#111111] p-10 sm:p-12 rounded-[2.5rem] shadow-xl shadow-indigo-500/5 dark:shadow-indigo-500/10 border border-zinc-200/60 dark:border-zinc-800/60 max-w-md w-full relative overflow-hidden">
-        
-        {/* Brillo decorativo sutil en la esquina superior */}
-        <div className="absolute -top-24 -right-24 w-48 h-48 bg-indigo-500/10 dark:bg-indigo-500/20 blur-3xl rounded-full pointer-events-none"></div>
-
-        <div className="relative z-10">
-          
-          {/* Encabezado */}
-          <div className="mb-10 text-center">
-            <div className="w-16 h-16 bg-zinc-100 dark:bg-zinc-900 rounded-2xl flex items-center justify-center mx-auto mb-6">
-              <span className="text-3xl">🔐</span>
-            </div>
-            <h2 className="text-3xl font-black text-zinc-900 dark:text-white tracking-tight">
-              Acceso Admin
-            </h2>
-            <p className="text-zinc-500 dark:text-zinc-400 mt-2 font-medium">
-              Ingresa a tu centro de mando
-            </p>
+    <div className="w-full">
+      <div className="flex flex-col md:flex-row justify-between items-center mb-8 gap-4 bg-white dark:bg-[#111] p-6 rounded-2xl shadow-sm border border-zinc-200 dark:border-zinc-800/80">
+        <div className="flex items-center gap-4">
+          <div className="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center text-lg shadow-md shadow-indigo-500/20">🚀</div>
+          <div>
+            <h1 className="text-xl font-bold text-zinc-900 dark:text-white tracking-tight">Panel Maestro</h1>
+            <p className="text-zinc-500 dark:text-zinc-400 text-xs font-medium">Control de VeciStore v2.0</p>
           </div>
-          
-          {/* Formulario */}
-          <form onSubmit={handleLogin} className="space-y-6">
-            <div>
-              <label className="block text-xs font-black text-zinc-700 dark:text-zinc-300 mb-2 uppercase tracking-widest">
-                Correo Electrónico
-              </label>
-              <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="w-full px-5 py-4 bg-zinc-50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 rounded-2xl focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 outline-none transition-all text-zinc-900 dark:text-zinc-100"
-                placeholder="admin@vecistore.com"
-                required
-              />
-            </div>
-            
-            <div>
-              <label className="block text-xs font-black text-zinc-700 dark:text-zinc-300 mb-2 uppercase tracking-widest">
-                Contraseña
-              </label>
-              <input
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="w-full px-5 py-4 bg-zinc-50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 rounded-2xl focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 outline-none transition-all text-zinc-900 dark:text-zinc-100"
-                placeholder="••••••••"
-                required
-              />
-            </div>
-
-            {/* Mensaje de Error Estilizado */}
-            {error && (
-              <div className="bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 p-4 rounded-2xl text-sm font-bold text-center border border-red-100 dark:border-red-900/50">
-                {error}
-              </div>
-            )}
-
-            {/* Botón Animado */}
-            <button
-              type="submit"
-              disabled={isLoading}
-              className={`w-full font-black py-4 px-6 rounded-2xl transition-all shadow-lg text-lg uppercase tracking-widest flex justify-center items-center gap-2 ${
-                isLoading 
-                  ? 'bg-zinc-300 dark:bg-zinc-800 text-zinc-500 cursor-not-allowed scale-95' 
-                  : 'bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 hover:scale-[1.02] active:scale-[0.98]'
-              }`}
-            >
-              {isLoading ? 'Autenticando...' : 'Entrar al Panel'}
-            </button>
-          </form>
-
+        </div>
+        
+        <div className="flex flex-wrap justify-center gap-2 bg-zinc-100 dark:bg-zinc-900/50 p-1 rounded-xl border border-zinc-200 dark:border-zinc-800">
+          <button onClick={() => setActiveTab('orders')} className={`px-4 py-1.5 rounded-lg text-sm font-semibold transition-all ${activeTab === 'orders' ? 'bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white shadow-sm' : 'text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300'}`}>Pedidos</button>
+          <button onClick={() => setActiveTab('metrics')} className={`px-4 py-1.5 rounded-lg text-sm font-semibold transition-all ${activeTab === 'metrics' ? 'bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white shadow-sm' : 'text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300'}`}>Métricas</button>
+          <button onClick={() => setActiveTab('products')} className={`px-4 py-1.5 rounded-lg text-sm font-semibold transition-all ${activeTab === 'products' ? 'bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white shadow-sm' : 'text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300'}`}>Inventario</button>
+          <button onClick={() => setActiveTab('subcategories')} className={`px-4 py-1.5 rounded-lg text-sm font-semibold transition-all ${activeTab === 'subcategories' ? 'bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white shadow-sm' : 'text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300'}`}>Subcategorías</button>
+          <button onClick={() => setActiveTab('categories')} className={`px-4 py-1.5 rounded-lg text-sm font-semibold transition-all ${activeTab === 'categories' ? 'bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white shadow-sm' : 'text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300'}`}>Categorías</button>
+          {/* 🔥 4. BOTÓN PARA LA NUEVA PESTAÑA */}
+          <button onClick={() => setActiveTab('whatsapp')} className={`px-4 py-1.5 rounded-lg text-sm font-semibold transition-all ${activeTab === 'whatsapp' ? 'bg-white dark:bg-green-900/30 text-green-600 dark:text-green-400 border border-green-200 dark:border-green-500/30 shadow-sm' : 'text-zinc-500 hover:text-green-600 dark:hover:text-green-400'}`}>Mensajes WA</button>
         </div>
       </div>
+
+      {activeTab === 'orders' && <OrdersTab pedidos={pedidos} products={products} updateOrderStatus={updateOrderStatus} />}
+      {activeTab === 'metrics' && <MetricsTab pedidos={pedidos} />}
+      {activeTab === 'products' && <InventoryTab products={products} setProducts={setProducts} categories={categories} subcategories={subcategories} />}
+      {activeTab === 'categories' && <CategoriesTab categories={categories} setCategories={setCategories} />}
+      {activeTab === 'subcategories' && <SubcategoriesTab categories={categories} subcategories={subcategories} setSubcategories={setSubcategories} />}
+      {/* 🔥 5. RENDERIZAMOS EL NUEVO COMPONENTE */}
+      {activeTab === 'whatsapp' && <WhatsappTab templates={waTemplates} setTemplates={setWaTemplates} />}
+
     </div>
   );
 }
