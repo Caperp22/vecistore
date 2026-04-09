@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { supabase } from '../../../lib/supabase';
+import { supabase } from '../../../lib/supabase'; // Asegúrate de que esta ruta no te dé error, si te da, cámbiala a '@/lib/supabase'
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 
@@ -10,6 +10,8 @@ import MetricsTab from '@/components/admin/MetricsTab';
 import InventoryTab from '@/components/admin/InventoryTab';
 import CategoriesTab from '@/components/admin/CategoriesTab';
 import SubcategoriesTab from '@/components/admin/SubcategoriesTab';
+// 🔥 1. IMPORTACIÓN DE LA NUEVA PESTAÑA
+import WhatsappTab from '@/components/admin/WhatsappTab'; 
 
 export default function Dashboard() {
   const router = useRouter();
@@ -20,9 +22,11 @@ export default function Dashboard() {
   const [subcategories, setSubcategories] = useState<any[]>([]); 
   const [pedidos, setPedidos] = useState<any[]>([]);
   const [products, setProducts] = useState<any[]>([]);
+  
+  // 🔥 2. ESTADO PARA LOS MENSAJES DE WHATSAPP
+  const [waTemplates, setWaTemplates] = useState<any[]>([]); 
 
   useEffect(() => {
-    // 1. Función para descargar todos los datos
     const fetchAdminData = async () => {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session || session.user.email !== 'caperp22@gmail.com') {
@@ -30,44 +34,40 @@ export default function Dashboard() {
         return;
       }
 
-      const [catsRes, subcatsRes, ordersRes, prodRes] = await Promise.all([
+      // 🔥 3. DESCARGAMOS LAS PLANTILLAS DESDE SUPABASE
+      const [catsRes, subcatsRes, ordersRes, prodRes, waRes] = await Promise.all([
         supabase.from('categories').select('*').order('id', { ascending: true }),
         supabase.from('subcategories').select('*').order('name', { ascending: true }),
         supabase.from('orders').select('*').order('created_at', { ascending: false }),
-        supabase.from('products').select('*, categories(name)').order('created_at', { ascending: false })
+        supabase.from('products').select('*, categories(name)').order('created_at', { ascending: false }),
+        supabase.from('whatsapp_templates').select('*') 
       ]);
 
       if (catsRes.data) setCategories(catsRes.data);
       if (subcatsRes.data) setSubcategories(subcatsRes.data);
       if (ordersRes.data) setPedidos(ordersRes.data);
       if (prodRes.data) setProducts(prodRes.data);
+      if (waRes.data) setWaTemplates(waRes.data);
       
       setLoading(false);
     };
 
-    // Carga inicial
     fetchAdminData();
 
-    // 🔥 2. TRANSMISIÓN EN VIVO PARA EL ADMINISTRADOR 🔥
     const channel = supabase.channel('admin-realtime')
-      // Escuchar NUEVOS PEDIDOS
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'orders' }, (payload) => {
-        // Mostramos la notificación obligatoria
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'orders' }, () => {
         toast.success('¡Nuevo pedido recibido! 🛍️', {
           description: 'El panel y las métricas se han actualizado al instante.',
           duration: 6000,
         });
-        // Recargamos los datos
         fetchAdminData();
       })
-      // Escuchar actualizaciones de pedidos (ej. si el cliente lo cancela o cambia de estado)
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'orders' }, () => {
-        fetchAdminData();
-      })
-      // Escuchar cambios en inventario para que también se actualice solo
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'orders' }, () => fetchAdminData())
       .on('postgres_changes', { event: '*', schema: 'public', table: 'products' }, () => fetchAdminData())
       .on('postgres_changes', { event: '*', schema: 'public', table: 'categories' }, () => fetchAdminData())
       .on('postgres_changes', { event: '*', schema: 'public', table: 'subcategories' }, () => fetchAdminData())
+      // 🔥 4. ESCUCHAR CAMBIOS EN LOS MENSAJES
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'whatsapp_templates' }, () => fetchAdminData())
       .subscribe();
 
     return () => {
@@ -84,25 +84,19 @@ export default function Dashboard() {
 
       if (error) throw error;
 
-      // 🔥 ESTA ES LA LÍNEA CLAVE: Mueve la tarjeta al instante visualmente
       setPedidos(prev => prev.map(p => 
-        p.id === orderId 
-          ? { ...p, status: newStatus, updated_at: new Date().toISOString() } 
-          : p
+        p.id === orderId ? { ...p, status: newStatus, updated_at: new Date().toISOString() } : p
       ));
 
       toast.success(`Pedido movido a ${newStatus}`);
 
-      // 🔥 DICCIONARIO DE MENSAJES PERSONALIZADOS (CON EMOJIS RESTAURADOS)
-      const mensajes: Record<string, string> = {
-        'En preparación': `¡Buenas noticias, ${customerName}! ✨ Tu pedido en *VeciStore* ya está en manos de nuestros creadores. Estamos cuidando cada detalle para que quede perfecto. 🧶🛠️`,
-        'Enviado': `¡Atención ${customerName}! 🚀 Tu pedido ha salido de nuestro taller y va camino a tu dirección. ¡Prepárate para recibir algo increíble! 📦💨`,
-        'Entregado': `¡Hola ${customerName}! 🌟 Según nuestros registros, ya tienes tu pedido contigo. ¡Esperamos que lo disfrutes muchísimo! No olvides etiquetarnos en redes sociales. 📸💖`,
-      };
-
-      // Si el estado tiene un mensaje definido, abrimos WhatsApp
-      if (customerPhone && mensajes[newStatus]) {
-        const url = `https://wa.me/${customerPhone}?text=${encodeURIComponent(mensajes[newStatus])}`;
+      // 🔥 5. USAMOS LAS PLANTILLAS DE LA BASE DE DATOS EN LUGAR DE CÓDIGO QUEMADO
+      const templateRecord = waTemplates.find(t => t.status === newStatus);
+      
+      if (customerPhone && templateRecord) {
+        // Cambiamos [CLIENTE] por el nombre real de la persona
+        const mensajeFinal = templateRecord.message.replace(/\[CLIENTE\]/g, customerName || 'Cliente');
+        const url = `https://wa.me/${customerPhone}?text=${encodeURIComponent(mensajeFinal)}`;
         window.open(url, '_blank');
       }
 
@@ -130,6 +124,8 @@ export default function Dashboard() {
           <button onClick={() => setActiveTab('products')} className={`px-4 py-1.5 rounded-lg text-sm font-semibold transition-all ${activeTab === 'products' ? 'bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white shadow-sm' : 'text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300'}`}>Inventario</button>
           <button onClick={() => setActiveTab('subcategories')} className={`px-4 py-1.5 rounded-lg text-sm font-semibold transition-all ${activeTab === 'subcategories' ? 'bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white shadow-sm' : 'text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300'}`}>Subcategorías</button>
           <button onClick={() => setActiveTab('categories')} className={`px-4 py-1.5 rounded-lg text-sm font-semibold transition-all ${activeTab === 'categories' ? 'bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white shadow-sm' : 'text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300'}`}>Categorías</button>
+          {/* 🔥 6. EL NUEVO BOTÓN */}
+          <button onClick={() => setActiveTab('whatsapp')} className={`px-4 py-1.5 rounded-lg text-sm font-semibold transition-all ${activeTab === 'whatsapp' ? 'bg-white dark:bg-green-900/30 text-green-600 dark:text-green-400 border border-green-200 dark:border-green-500/30 shadow-sm' : 'text-zinc-500 hover:text-green-600 dark:hover:text-green-400'}`}>Mensajes WA</button>
         </div>
       </div>
 
@@ -138,6 +134,8 @@ export default function Dashboard() {
       {activeTab === 'products' && <InventoryTab products={products} setProducts={setProducts} categories={categories} subcategories={subcategories} />}
       {activeTab === 'categories' && <CategoriesTab categories={categories} setCategories={setCategories} />}
       {activeTab === 'subcategories' && <SubcategoriesTab categories={categories} subcategories={subcategories} setSubcategories={setSubcategories} />}
+      {/* 🔥 7. EL COMPONENTE DE EDICIÓN */}
+      {activeTab === 'whatsapp' && <WhatsappTab templates={waTemplates} setTemplates={setWaTemplates} />}
 
     </div>
   );
