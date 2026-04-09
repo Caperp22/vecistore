@@ -6,8 +6,7 @@ import { toast } from 'sonner';
 
 export default function WhatsappTab({ templates, setTemplates }: { templates: any[], setTemplates: any }) {
   const [loading, setLoading] = useState(false);
-  // Clonamos los templates para poder editarlos antes de guardar
-  const [editData, setEditData] = useState<any[]>(templates);
+  const [editData, setEditData] = useState<any[]>(templates || []);
 
   const handleTextChange = (status: string, newText: string) => {
     setEditData(prev => prev.map(t => t.status === status ? { ...t, message: newText } : t));
@@ -23,7 +22,6 @@ export default function WhatsappTab({ templates, setTemplates }: { templates: an
 
       if (error) throw error;
       
-      // Actualizamos el estado global para que el cambio sea instantáneo
       setTemplates((prev: any[]) => prev.map(t => t.status === status ? { ...t, message } : t));
       toast.success(`Mensaje de "${status}" actualizado 💾`);
     } catch (err: any) {
@@ -32,6 +30,15 @@ export default function WhatsappTab({ templates, setTemplates }: { templates: an
       setLoading(false);
     }
   };
+
+  // Si no hay plantillas cargadas aún
+  if (!editData || editData.length === 0) {
+    return (
+      <div className="text-center py-20 bg-white dark:bg-[#111] rounded-[2rem] border border-dashed border-zinc-200 dark:border-zinc-800">
+        <p className="text-zinc-500 font-medium">Asegúrate de haber ejecutado el código SQL en Supabase para crear las plantillas.</p>
+      </div>
+    );
+  }
 
   return (
     <div className="animate-in fade-in duration-300">
@@ -63,7 +70,6 @@ export default function WhatsappTab({ templates, setTemplates }: { templates: an
               placeholder="Escribe tu mensaje aquí..."
             />
 
-            {/* El botón solo se activa si hay cambios sin guardar */}
             <button
               onClick={() => handleGuardar(template.status, template.message)}
               disabled={loading || templates.find(t => t.status === template.status)?.message === template.message}
