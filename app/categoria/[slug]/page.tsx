@@ -5,20 +5,13 @@ import { useParams } from 'next/navigation';
 import { supabase } from '../../../lib/supabase';
 import Link from 'next/link';
 
-// 🔥 DICCIONARIO DE SUBCATEGORÍAS
-const SUBCATEGORIAS_MAP: Record<string, string[]> = {
-  'Amigurumis': ['Personajes', 'Animales', 'Llaveros', 'Gorros', 'Personalizados', 'Otros'],
-  'Impresión 3D': ['Figuras', 'Macetas', 'Mecánicos', 'Accesorios', 'Repuestos', 'Otros'],
-  'Manualidades': ['Resina', 'Papelería', 'Arcilla', 'Tela', 'Pintura', 'Otros'],
-  'Hama Beads': ['Llaveros', 'Imanes', 'Cuadros', 'Posavasos', 'Figuras', 'Otros']
-};
-
-// 🎨 DICCIONARIO DE ICONOS PARA QUE SE VEA PREMIUM
+// 🎨 DICCIONARIO DE ICONOS (Si creas una subcategoría nueva, usará '✨' por defecto)
 const SUBCAT_ICONS: Record<string, string> = {
   'Personajes': '🦸‍♂️', 'Animales': '🦊', 'Llaveros': '🔑', 'Gorros': '🧢', 'Personalizados': '✨',
   'Figuras': '🗽', 'Macetas': '🪴', 'Mecánicos': '⚙️', 'Accesorios': '💍', 'Repuestos': '🔧',
   'Resina': '💧', 'Papelería': '📝', 'Arcilla': '🏺', 'Tela': '🧵', 'Pintura': '🎨',
-  'Imanes': '🧲', 'Cuadros': '🖼️', 'Posavasos': '☕', 'Otros': '📦'
+  'Imanes': '🧲', 'Cuadros': '🖼️', 'Posavasos': '☕', 'Otros': '📦',
+  'Día de la Madre': '💝', 'Halloween': '🎃', 'Personajes Anime': '🗡️'
 };
 
 export default function CategoryPage() {
@@ -27,15 +20,17 @@ export default function CategoryPage() {
 
   const [category, setCategory] = useState<any>(null);
   const [products, setProducts] = useState<any[]>([]);
+  // 🔥 NUEVO ESTADO PARA ALMACENAR LAS SUBCATEGORÍAS REALES DE LA BASE DE DATOS
+  const [subcategories, setSubcategories] = useState<any[]>([]); 
   const [loading, setLoading] = useState(true);
   
-  // 🔥 Si es null, mostramos las subcategorías. Si tiene texto, mostramos los productos.
   const [activeSubcat, setActiveSubcat] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchData = async () => {
       if (!slug) return;
       
+      // 1. Buscamos la categoría principal
       const { data: catData } = await supabase
         .from('categories')
         .select('*')
@@ -44,7 +39,17 @@ export default function CategoryPage() {
 
       if (catData) {
         setCategory(catData);
+
+        // 🔥 2. Buscamos las subcategorías reales conectadas a esta categoría
+        const { data: subData } = await supabase
+          .from('subcategories')
+          .select('*')
+          .eq('category_id', catData.id)
+          .order('name', { ascending: true }); // Ordenadas alfabéticamente
+          
+        if (subData) setSubcategories(subData);
         
+        // 3. Buscamos los productos
         const { data: prodData } = await supabase
           .from('products')
           .select('*')
@@ -72,13 +77,12 @@ export default function CategoryPage() {
     );
   }
 
-  const subcategorias = SUBCATEGORIAS_MAP[category.name] || [];
   const filteredProducts = activeSubcat ? products.filter(p => p.subcategory === activeSubcat) : [];
 
   return (
     <div className="w-full pb-20 animate-in fade-in duration-500">
       
-      {/* 🌟 HERO SECTION (Portada Dinámica) */}
+      {/* 🌟 HERO SECTION */}
       <div className={`relative w-full rounded-[2.5rem] overflow-hidden mb-10 shadow-sm border border-zinc-200/50 dark:border-zinc-800/50 transition-all duration-500 ${activeSubcat ? 'h-40 sm:h-56' : 'h-64 sm:h-80'}`}>
         <img 
           src={category.image_url || 'https://via.placeholder.com/1200x400?text=Portada'} 
@@ -103,7 +107,7 @@ export default function CategoryPage() {
         </div>
       </div>
 
-      {/* 🗂️ VISTA 1: GRID DE SUBCATEGORÍAS */}
+      {/* 🗂️ VISTA 1: GRID DE SUBCATEGORÍAS DINÁMICAS */}
       {!activeSubcat && (
         <div className="animate-in slide-in-from-bottom-4 fade-in duration-500">
           <div className="flex items-center gap-4 mb-8 border-b border-zinc-200 dark:border-zinc-800 pb-4">
@@ -113,15 +117,15 @@ export default function CategoryPage() {
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
-            {subcategorias.map((sub: string) => {
-              // Calculamos cuántos productos hay en esta subcategoría para mostrárselo al cliente
-              const conteo = products.filter(p => p.subcategory === sub).length;
-              const icono = SUBCAT_ICONS[sub] || '✨';
+            {subcategories.map((sub: any) => {
+              // Calculamos cuántos productos hay usando el nombre de la subcategoría
+              const conteo = products.filter(p => p.subcategory === sub.name).length;
+              const icono = SUBCAT_ICONS[sub.name] || '✨';
 
               return (
                 <button
-                  key={sub}
-                  onClick={() => setActiveSubcat(sub)}
+                  key={sub.id}
+                  onClick={() => setActiveSubcat(sub.name)}
                   className="group bg-white dark:bg-[#111] border border-zinc-200 dark:border-zinc-800 rounded-3xl p-6 text-left hover:border-indigo-500/50 hover:shadow-xl hover:shadow-indigo-500/10 transition-all duration-300 flex items-center gap-5 relative overflow-hidden"
                 >
                   <div className="absolute -right-6 -top-6 text-8xl opacity-5 group-hover:scale-110 transition-transform duration-500 pointer-events-none">
@@ -134,7 +138,7 @@ export default function CategoryPage() {
                   
                   <div>
                     <h3 className="text-lg font-black text-zinc-900 dark:text-white group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">
-                      {sub}
+                      {sub.name}
                     </h3>
                     <p className="text-xs font-bold text-zinc-500 mt-1">
                       {conteo === 1 ? '1 producto' : `${conteo} productos`} publicados
@@ -144,10 +148,16 @@ export default function CategoryPage() {
               );
             })}
           </div>
+          
+          {subcategories.length === 0 && (
+             <div className="text-center py-10">
+                <p className="text-zinc-500">Aún no hay subcategorías creadas aquí.</p>
+             </div>
+          )}
         </div>
       )}
 
-      {/* 📦 VISTA 2: PRODUCTOS DE LA SUBCATEGORÍA SELECCIONADA */}
+      {/* 📦 VISTA 2: PRODUCTOS */}
       {activeSubcat && (
         <div className="animate-in slide-in-from-bottom-4 fade-in duration-500">
           
