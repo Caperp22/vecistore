@@ -93,7 +93,7 @@ export default function Dashboard() {
 
       toast.success(`Pedido movido a ${newStatus}`);
 
-      // 🔥 DICCIONARIO DE MENSAJES PERSONALIZADOS
+      // 🔥 DICCIONARIO DE MENSAJES PERSONALIZADOS (CON EMOJIS RESTAURADOS)
       const mensajes: Record<string, string> = {
         'En preparación': `¡Buenas noticias, ${customerName}! ✨ Tu pedido en *VeciStore* ya está en manos de nuestros creadores. Estamos cuidando cada detalle para que quede perfecto. 🧶🛠️`,
         'Enviado': `¡Atención ${customerName}! 🚀 Tu pedido ha salido de nuestro taller y va camino a tu dirección. ¡Prepárate para recibir algo increíble! 📦💨`,
