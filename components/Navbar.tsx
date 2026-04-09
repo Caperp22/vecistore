@@ -36,6 +36,16 @@ export default function Navbar() {
 
           {/* MENÚ DE ESCRITORIO */}
           <div className="hidden md:flex space-x-8 items-center">
+            
+            {/* 🔥 NUEVO BOTÓN INICIO (ESCRITORIO) 🔥 */}
+            <Link 
+              href="/" 
+              className="text-sm text-indigo-600 dark:text-indigo-400 font-bold hover:text-indigo-800 dark:hover:text-indigo-300 transition-colors"
+            >
+              Inicio
+            </Link>
+
+            {/* Lista de Categorías */}
             {categories.map((cat) => (
               <Link 
                 key={cat.id} 
@@ -59,17 +69,14 @@ export default function Navbar() {
                   )}
                 </button>
               )}
-              {/* En escritorio: Campana, Usuario, Carrito */}
               <NotificationBell />
               <UserMenu />
               <CartWidget />
             </div>
           </div>
 
-          {/* ACCIONES MÓVILES (Campana movida a la izquierda) */}
+          {/* ACCIONES MÓVILES */}
           <div className="md:hidden flex items-center">
-            
-            {/* GRUPO IZQUIERDO: Dark Mode + CAMPANITA */}
             <div className="flex items-center gap-1 mr-2 border-r border-zinc-200 dark:border-zinc-800 pr-2">
               {mounted && (
                 <button 
@@ -86,7 +93,6 @@ export default function Navbar() {
               <NotificationBell />
             </div>
 
-            {/* GRUPO DERECHO: Usuario + Carrito + Menú */}
             <div className="flex items-center gap-1">
               <UserMenu />
               <CartWidget />
@@ -107,11 +113,21 @@ export default function Navbar() {
         </div>
       </div>
 
-      {/* MENÚ MÓVIL (SOLO CATEGORÍAS) */}
+      {/* MENÚ MÓVIL (DESPLEGABLE) */}
       {isMobileMenuOpen && (
         <div className="md:hidden bg-white/95 dark:bg-[#0A0A0A]/95 backdrop-blur-xl border-t border-zinc-200 dark:border-zinc-800 absolute w-full shadow-2xl animate-in fade-in slide-in-from-top-2">
           <div className="px-6 py-8 space-y-2">
-            <p className="text-[10px] font-black text-zinc-400 uppercase tracking-widest mb-4">Categorías</p>
+            <p className="text-[10px] font-black text-zinc-400 uppercase tracking-widest mb-4">Menú de Navegación</p>
+            
+            {/* 🔥 NUEVO BOTÓN INICIO (MÓVIL) 🔥 */}
+            <Link 
+              href="/" 
+              onClick={() => setIsMobileMenuOpen(false)}
+              className="block py-3 text-xl font-black text-indigo-600 dark:text-indigo-400 transition-colors"
+            >
+              Inicio
+            </Link>
+
             {categories.map((cat) => (
               <Link 
                 key={cat.id} 
