@@ -13,13 +13,6 @@ export default function PerfilPage() {
   const [pedidos, setPedidos] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // 🔥 ESTADOS PARA EDICIÓN DE PERFIL (Ocultos por defecto)
-  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
-  const [nombre, setNombre] = useState(user?.user_metadata?.full_name || '');
-  const [telefono, setTelefono] = useState(user?.user_metadata?.phone || '');
-  const [direccion, setDireccion] = useState(user?.user_metadata?.address || '');
-  const [actualizando, setActualizando] = useState(false);
-
   useEffect(() => {
     let isMounted = true;
     let channel: any = null;
@@ -36,28 +29,17 @@ export default function PerfilPage() {
 
       if (!channel) {
         channel = supabase.channel(`realtime-pedidos-${userId}`)
-          .on('postgres_changes', { 
-            event: 'UPDATE', 
-            schema: 'public', 
-            table: 'orders', 
-            filter: `user_id=eq.${userId}` 
-          }, 
+          .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'orders', filter: `user_id=eq.${userId}` }, 
           async () => {
             toast.success('📦 ¡Actualización de tu pedido!');
             const { data: newData } = await supabase.from('orders').select('*').eq('user_id', userId).order('created_at', { ascending: false });
             if (newData && isMounted) setPedidos(newData);
-          })
-          .subscribe();
+          }).subscribe();
       }
     };
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      if (session?.user && isMounted) {
-        traerPedidos(session.user.id);
-        setNombre(session.user.user_metadata?.full_name || '');
-        setTelefono(session.user.user_metadata?.phone || '');
-        setDireccion(session.user.user_metadata?.address || '');
-      }
+      if (session?.user && isMounted) traerPedidos(session.user.id);
     });
 
     const revisarConPaciencia = async () => {
@@ -77,22 +59,6 @@ export default function PerfilPage() {
     return () => { isMounted = false; subscription.unsubscribe(); if (channel) supabase.removeChannel(channel); };
   }, [router]);
 
-  const handleGuardarPerfil = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setActualizando(true);
-    const { error } = await supabase.auth.updateUser({
-      data: { full_name: nombre, phone: telefono, address: direccion }
-    });
-    if (error) {
-      toast.error('Error al actualizar: ' + error.message);
-    } else {
-      toast.success('¡Perfil actualizado! ✨');
-      setIsEditModalOpen(false);
-      router.refresh();
-    }
-    setActualizando(false);
-  };
-
   if (loading) return (
     <div className="flex flex-col items-center justify-center min-h-[50vh] animate-in fade-in duration-500">
       <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-indigo-600 mb-6"></div>
@@ -103,23 +69,9 @@ export default function PerfilPage() {
   return (
     <div className="py-10 max-w-5xl mx-auto px-4 animate-in fade-in duration-700">
       
-      {/* Cabecera del Perfil con Botón de Editar Estilo Icono */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end mb-10 border-b border-zinc-200 dark:border-zinc-800 pb-6 gap-6">
         <div>
-          <div className="flex items-center gap-3">
-            <h1 className="text-3xl sm:text-4xl font-black text-zinc-900 dark:text-white tracking-tight">Mis Pedidos</h1>
-            {/* 🔥 BOTÓN DE EDITAR PERFIL (Como pediste, sutil) */}
-            <button 
-              onClick={() => setIsEditModalOpen(true)}
-              className="p-2 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-full transition-colors group"
-              title="Editar mi perfil"
-            >
-              <svg className="w-5 h-5 text-zinc-400 group-hover:text-indigo-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37a1.724 1.724 0 002.572-1.065z" />
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-              </svg>
-            </button>
-          </div>
+          <h1 className="text-3xl sm:text-4xl font-black text-zinc-900 dark:text-white tracking-tight">Mis Pedidos</h1>
           <p className="text-zinc-500 dark:text-zinc-400 mt-2 font-medium flex items-center gap-2">
             <span>👋</span> Hola, {user?.user_metadata?.full_name || user?.email}
           </p>
@@ -145,7 +97,6 @@ export default function PerfilPage() {
           {pedidos.map((pedido) => (
             <div key={pedido.id} className="bg-white dark:bg-[#111111] p-6 sm:p-8 rounded-4xl shadow-sm border border-zinc-200/60 dark:border-zinc-800/60 hover:shadow-lg hover:shadow-indigo-500/5 dark:hover:shadow-indigo-500/10 transition-all duration-300">
               
-              {/* Bloque Superior: Fecha y Estado */}
               <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center border-b border-zinc-100 dark:border-zinc-800/60 pb-5 mb-6 gap-4">
                 <div className="flex items-center gap-3">
                   <div className="w-2 h-6 bg-indigo-500 rounded-full"></div>
@@ -171,7 +122,6 @@ export default function PerfilPage() {
                 </div>
               </div>
 
-              {/* Lista de Productos estilo "Recibo" */}
               <div className="bg-zinc-50 dark:bg-zinc-900/40 p-5 rounded-3xl border border-zinc-100 dark:border-zinc-800/60 mb-6">
                 <ul className="space-y-4">
                   {pedido.items.map((item: any, i: number) => (
@@ -205,37 +155,6 @@ export default function PerfilPage() {
               </div>
             </div>
           ))}
-        </div>
-      )}
-
-      {/* 🔥 MODAL DE EDICIÓN DE PERFIL (Solo aparece al dar clic en el icono de engranaje) */}
-      {isEditModalOpen && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in">
-          <div className="bg-white dark:bg-[#111] border border-zinc-200 dark:border-zinc-800 rounded-3xl shadow-2xl max-w-md w-full overflow-hidden flex flex-col relative animate-in zoom-in-95">
-            <div className="p-6 border-b border-zinc-100 dark:border-zinc-800/80 flex justify-between items-center">
-              <h2 className="text-xl font-bold">Mis Datos de Envío</h2>
-              <button onClick={() => setIsEditModalOpen(false)} className="text-zinc-400 hover:text-zinc-600 p-2">
-                <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
-              </button>
-            </div>
-            <form onSubmit={handleGuardarPerfil} className="p-6 space-y-4">
-              <div>
-                <label className="text-[10px] font-bold uppercase text-zinc-400 mb-1 block px-1">Nombre Completo</label>
-                <input type="text" value={nombre} onChange={e => setNombre(e.target.value)} className="w-full p-3 bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl outline-none focus:border-indigo-500 text-sm" required />
-              </div>
-              <div>
-                <label className="text-[10px] font-bold uppercase text-zinc-400 mb-1 block px-1">Teléfono (WhatsApp)</label>
-                <input type="text" value={telefono} onChange={e => setTelefono(e.target.value)} placeholder="Ej: 573001234567" className="w-full p-3 bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl outline-none focus:border-indigo-500 text-sm" required />
-              </div>
-              <div>
-                <label className="text-[10px] font-bold uppercase text-zinc-400 mb-1 block px-1">Dirección de Envío</label>
-                <textarea value={direccion} onChange={e => setDireccion(e.target.value)} rows={2} className="w-full p-3 bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl outline-none focus:border-indigo-500 text-sm resize-none" required />
-              </div>
-              <button type="submit" disabled={actualizando} className="w-full bg-indigo-600 text-white p-3.5 rounded-xl font-bold text-sm shadow-lg shadow-indigo-500/20 hover:bg-indigo-700 disabled:opacity-50 transition-all mt-2">
-                {actualizando ? 'Guardando...' : 'Actualizar Información'}
-              </button>
-            </form>
-          </div>
         </div>
       )}
     </div>
