@@ -1,17 +1,45 @@
+'use client'; // 🔥 Ahora es un Client Component para escuchar en tiempo real
+
+import { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import Link from 'next/link';
 
-export const revalidate = 0; 
+export default function Home() {
+  const [categories, setCategories] = useState<any[]>([]);
 
-export default async function Home() {
-  // Consultamos las categorías directamente de Supabase
-  const { data: categories } = await supabase
-    .from('categories')
-    .select('*')
-    .order('id', { ascending: true });
+  useEffect(() => {
+    // 1. Función para buscar los datos
+    const fetchCategories = async () => {
+      const { data } = await supabase
+        .from('categories')
+        .select('*')
+        .order('id', { ascending: true });
+      if (data) setCategories(data);
+    };
+
+    // 2. Traer los datos la primera vez
+    fetchCategories();
+
+    // 🔥 3. SUSCRIPCIÓN EN TIEMPO REAL 🔥
+    const channel = supabase.channel('home-realtime')
+      .on(
+        'postgres_changes', 
+        { event: '*', schema: 'public', table: 'categories' }, 
+        (payload) => {
+          // Si algo cambia en Supabase, volvemos a descargar los datos automáticamente
+          fetchCategories(); 
+        }
+      )
+      .subscribe();
+
+    // Limpiamos la conexión cuando el usuario se va de la página
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, []);
 
   return (
-    <div className="py-10">
+    <div className="py-10 animate-in fade-in duration-500">
       
       <div className="relative text-center mb-20 bg-white dark:bg-[#111111] py-20 sm:py-28 rounded-[3rem] border border-zinc-200/60 dark:border-zinc-800/60 shadow-sm overflow-hidden">
         <div className="absolute inset-0 bg-linear-to-b from-indigo-50/50 to-transparent dark:from-indigo-900/10 dark:to-transparent pointer-events-none" />
@@ -40,7 +68,6 @@ export default async function Home() {
           <Link href={`/categoria/${cat.slug}`} key={cat.id} className="block group">
             <div className="relative h-96 rounded-3xl overflow-hidden border border-zinc-200/50 dark:border-zinc-800/50 shadow-sm hover:shadow-2xl hover:shadow-indigo-500/20 dark:hover:shadow-indigo-500/10 hover:-translate-y-2 transition-all duration-500">
               
-              {/* 🔥 AHORA LEE LA FOTO LOCAL DE TU BASE DE DATOS 🔥 */}
               <img 
                 src={cat.image_url || 'https://via.placeholder.com/600x800?text=Sube+una+foto'} 
                 alt={cat.name} 

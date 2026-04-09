@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { usePathname } from 'next/navigation'; // 🔥 1. Importamos la herramienta para leer la URL
 import { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import CartWidget from './CartWidget';
@@ -13,11 +14,13 @@ export default function Navbar() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const { setTheme, resolvedTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
+  
+  const pathname = usePathname(); // 🔥 2. Obtenemos la ruta actual exacta
 
   useEffect(() => {
     setMounted(true);
     const fetchCats = async () => {
-      const { data } = await supabase.from('categories').select('*');
+      const { data } = await supabase.from('categories').select('*').order('id', { ascending: true });
       if (data) setCategories(data);
     };
     fetchCats();
@@ -37,24 +40,37 @@ export default function Navbar() {
           {/* MENÚ DE ESCRITORIO */}
           <div className="hidden md:flex space-x-8 items-center">
             
-            {/* 🔥 NUEVO BOTÓN INICIO (ESCRITORIO) 🔥 */}
+            {/* 🔥 Lógica dinámica para el botón INICIO 🔥 */}
             <Link 
               href="/" 
-              className="text-sm text-indigo-600 dark:text-indigo-400 font-bold hover:text-indigo-800 dark:hover:text-indigo-300 transition-colors"
+              className={`text-sm font-bold transition-colors ${
+                pathname === '/' 
+                  ? 'text-indigo-600 dark:text-indigo-400' // Color si está activo
+                  : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white' // Color normal
+              }`}
             >
               Inicio
             </Link>
 
-            {/* Lista de Categorías */}
-            {categories.map((cat) => (
-              <Link 
-                key={cat.id} 
-                href={`/categoria/${cat.slug}`} 
-                className="text-sm text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white font-medium transition-colors"
-              >
-                {cat.name}
-              </Link>
-            ))}
+            {/* 🔥 Lógica dinámica para LAS CATEGORÍAS 🔥 */}
+            {categories.map((cat) => {
+              const rutaCategoria = `/categoria/${cat.slug}`;
+              const estaActiva = pathname === rutaCategoria;
+
+              return (
+                <Link 
+                  key={cat.id} 
+                  href={rutaCategoria} 
+                  className={`text-sm font-bold transition-colors ${
+                    estaActiva 
+                      ? 'text-indigo-600 dark:text-indigo-400' // Color si está activo
+                      : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white' // Color normal
+                  }`}
+                >
+                  {cat.name}
+                </Link>
+              );
+            })}
             
             <div className="pl-6 border-l border-zinc-200 dark:border-zinc-800 flex items-center gap-5">
               {mounted && (
@@ -119,25 +135,39 @@ export default function Navbar() {
           <div className="px-6 py-8 space-y-2">
             <p className="text-[10px] font-black text-zinc-400 uppercase tracking-widest mb-4">Menú de Navegación</p>
             
-            {/* 🔥 NUEVO BOTÓN INICIO (MÓVIL) 🔥 */}
+            {/* Lógica dinámica para INICIO (Móvil) */}
             <Link 
               href="/" 
               onClick={() => setIsMobileMenuOpen(false)}
-              className="block py-3 text-xl font-black text-indigo-600 dark:text-indigo-400 transition-colors"
+              className={`block py-3 text-xl font-black transition-colors ${
+                pathname === '/' 
+                  ? 'text-indigo-600 dark:text-indigo-400' 
+                  : 'text-zinc-800 dark:text-zinc-200 hover:text-indigo-600 dark:hover:text-indigo-400'
+              }`}
             >
               Inicio
             </Link>
 
-            {categories.map((cat) => (
-              <Link 
-                key={cat.id} 
-                href={`/categoria/${cat.slug}`} 
-                onClick={() => setIsMobileMenuOpen(false)}
-                className="block py-3 text-xl font-bold text-zinc-800 dark:text-zinc-200 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors"
-              >
-                {cat.name}
-              </Link>
-            ))}
+            {/* Lógica dinámica para CATEGORÍAS (Móvil) */}
+            {categories.map((cat) => {
+              const rutaCategoria = `/categoria/${cat.slug}`;
+              const estaActiva = pathname === rutaCategoria;
+
+              return (
+                <Link 
+                  key={cat.id} 
+                  href={rutaCategoria} 
+                  onClick={() => setIsMobileMenuOpen(false)}
+                  className={`block py-3 text-xl font-bold transition-colors ${
+                    estaActiva 
+                      ? 'text-indigo-600 dark:text-indigo-400' 
+                      : 'text-zinc-800 dark:text-zinc-200 hover:text-indigo-600 dark:hover:text-indigo-400'
+                  }`}
+                >
+                  {cat.name}
+                </Link>
+              );
+            })}
           </div>
         </div>
       )}

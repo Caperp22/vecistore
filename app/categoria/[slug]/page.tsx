@@ -17,40 +17,36 @@ export default function CategoryPage() {
   const [activeSubcat, setActiveSubcat] = useState<string | null>(null);
 
   useEffect(() => {
+    if (!slug) return;
+
     const fetchData = async () => {
-      if (!slug) return;
-      
-      const { data: catData } = await supabase
-        .from('categories')
-        .select('*')
-        .eq('slug', slug)
-        .single();
+      const { data: catData } = await supabase.from('categories').select('*').eq('slug', slug).single();
 
       if (catData) {
         setCategory(catData);
 
-        // 🔥 Lo traemos ordenado por nuestro nuevo "sort_order"
-        const { data: subData } = await supabase
-          .from('subcategories')
-          .select('*')
-          .eq('category_id', catData.id)
-          .order('sort_order', { ascending: true })
-          .order('name', { ascending: true });
-          
+        const { data: subData } = await supabase.from('subcategories').select('*').eq('category_id', catData.id).order('sort_order', { ascending: true }).order('name', { ascending: true });
         if (subData) setSubcategories(subData);
         
-        const { data: prodData } = await supabase
-          .from('products')
-          .select('*')
-          .eq('category_id', catData.id)
-          .order('created_at', { ascending: false });
-          
+        const { data: prodData } = await supabase.from('products').select('*').eq('category_id', catData.id).order('created_at', { ascending: false });
         if (prodData) setProducts(prodData);
       }
       setLoading(false);
     };
     
+    // 1. Carga inicial
     fetchData();
+
+    // 🔥 2. SUSCRIPCIÓN MULTI-TABLA EN TIEMPO REAL 🔥
+    const channel = supabase.channel('category-realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'categories' }, () => { fetchData(); })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'subcategories' }, () => { fetchData(); })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'products' }, () => { fetchData(); })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [slug]);
 
   if (loading) {
@@ -102,7 +98,6 @@ export default function CategoryPage() {
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
             {subcategories.map((sub: any) => {
               const conteo = products.filter(p => p.subcategory === sub.name).length;
-              // 🔥 Leemos el icono de la base de datos
               const icono = sub.icon || '✨';
 
               return (
@@ -142,7 +137,6 @@ export default function CategoryPage() {
         <div className="animate-in slide-in-from-bottom-4 fade-in duration-500">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8 border-b border-zinc-200 dark:border-zinc-800 pb-4">
             <h2 className="text-2xl font-black text-zinc-900 dark:text-white tracking-tight flex items-center gap-3">
-              {/* 🔥 Leemos el icono para el título */}
               <span className="text-3xl">{subcategories.find(s => s.name === activeSubcat)?.icon || '✨'}</span> 
               Catálogo de {activeSubcat}
             </h2>
