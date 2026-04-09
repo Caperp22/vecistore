@@ -147,7 +147,7 @@ export default function CategoryPage() {
           </div>
 
           {filteredProducts.length === 0 ? (
-            <div className="text-center py-20 bg-white dark:bg-[#111] rounded-[2rem] border border-dashed border-zinc-200 dark:border-zinc-800">
+            <div className="text-center py-20 bg-white dark:bg-[#111] rounded-4xl border border-dashed border-zinc-200 dark:border-zinc-800">
               <span className="text-4xl opacity-50 mb-3 block">📭</span>
               <h3 className="text-lg font-bold text-zinc-900 dark:text-white mb-1">Aún no hay inventario aquí</h3>
               <p className="text-zinc-500 text-sm font-medium">Pronto añadiremos productos increíbles en la sección "{activeSubcat}".</p>
@@ -159,7 +159,7 @@ export default function CategoryPage() {
                   <div className="h-56 w-full bg-zinc-100 dark:bg-zinc-900 relative overflow-hidden">
                     <img src={p.image_url || 'https://via.placeholder.com/400?text=Sin+Imagen'} alt={p.title} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500 ease-out" />
                   </div>
-                  <div className="p-5 flex flex-col flex-grow">
+                  <div className="p-5 flex flex-col grow">
                     <h3 className="font-bold text-zinc-900 dark:text-white text-base mb-1 line-clamp-1 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">{p.title}</h3>
                     <p className="text-zinc-500 text-xs mb-4 line-clamp-2 leading-relaxed">{p.description}</p>
                     <div className="mt-auto flex items-center justify-between pt-4 border-t border-zinc-100 dark:border-zinc-800/60">

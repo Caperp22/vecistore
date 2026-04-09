@@ -79,7 +79,7 @@ export default function CarritoPage() {
   if (cart.length === 0) {
     return (
       <div className="py-24 text-center max-w-2xl mx-auto px-4">
-        <div className="bg-white dark:bg-[#111111] p-12 rounded-[2rem] border border-zinc-200/60 dark:border-zinc-800/60 shadow-sm">
+        <div className="bg-white dark:bg-[#111111] p-12 rounded-4xl border border-zinc-200/60 dark:border-zinc-800/60 shadow-sm">
           <div className="w-20 h-20 bg-zinc-100 dark:bg-zinc-800/50 rounded-full flex items-center justify-center mx-auto mb-6">
             <span className="text-4xl">🛒</span>
           </div>
@@ -105,18 +105,18 @@ export default function CarritoPage() {
       <div className="flex flex-col lg:flex-row gap-10">
         
         {/* LISTA DE PRODUCTOS (Izquierda) */}
-        <div className="flex-grow space-y-6">
+        <div className="grow space-y-6">
           <ul className="space-y-6">
             {cart.map((producto, index) => (
               <li key={index} className="bg-white dark:bg-[#111111] p-5 sm:p-6 rounded-3xl border border-zinc-200/60 dark:border-zinc-800/60 shadow-sm flex flex-col sm:flex-row items-center gap-6 relative group transition-all hover:shadow-md">
                 
                 {/* Imagen */}
-                <div className="w-32 h-32 rounded-2xl overflow-hidden bg-zinc-100 dark:bg-zinc-900 flex-shrink-0">
+                <div className="w-32 h-32 rounded-2xl overflow-hidden bg-zinc-100 dark:bg-zinc-900 shrink-0">
                   <img src={producto.image_url} alt={producto.title} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" />
                 </div>
                 
                 {/* Info del Producto */}
-                <div className="flex-grow text-center sm:text-left w-full">
+                <div className="grow text-center sm:text-left w-full">
                   <div className="flex justify-between items-start mb-2">
                     <h3 className="text-xl font-bold text-zinc-900 dark:text-white leading-tight pr-8">{producto.title}</h3>
                     {/* Botón Eliminar (esquina) */}
@@ -147,7 +147,7 @@ export default function CarritoPage() {
 
           {/* Caja de Observaciones */}
           <div className="bg-white dark:bg-[#111111] p-6 rounded-3xl border border-zinc-200/60 dark:border-zinc-800/60 shadow-sm mt-6">
-            <label className="block text-sm font-bold text-zinc-700 dark:text-zinc-300 mb-3 flex items-center gap-2">
+            <label className="text-sm font-bold text-zinc-700 dark:text-zinc-300 mb-3 flex items-center gap-2">
               <span>📝</span> Instrucciones Especiales
             </label>
             <textarea 
@@ -161,8 +161,8 @@ export default function CarritoPage() {
         </div>
 
         {/* RESUMEN DE COMPRA (Derecha - Fijo) */}
-        <div className="lg:w-[380px] flex-shrink-0">
-          <div className="bg-white dark:bg-[#111111] p-8 rounded-[2rem] border border-zinc-200/60 dark:border-zinc-800/60 shadow-lg sticky top-24">
+        <div className="lg:w-95 shrink-0">
+          <div className="bg-white dark:bg-[#111111] p-8 rounded-4xl border border-zinc-200/60 dark:border-zinc-800/60 shadow-lg sticky top-24">
             <h2 className="text-xl font-black text-zinc-900 dark:text-white mb-6 tracking-tight">Resumen de Compra</h2>
             
             <div className="space-y-4 mb-6 text-zinc-600 dark:text-zinc-400">
