@@ -163,7 +163,15 @@ export default function OrdersTab({ pedidos, products, updateOrderStatus }: { pe
                     <StatusSelector 
                       estadoActual={pedido.status} 
                       isHistorial={orderFilter === 'Historial'}
-                      onCambiarEstado={(nuevoEstado: string) => updateOrderStatus(pedido.id, nuevoEstado)}
+                      // 🔥 Pasamos el ID, el nuevo estado, y los datos del cliente para WhatsApp
+                      onCambiarEstado={(nuevoEstado: string) => 
+                        updateOrderStatus(
+                          pedido.id, 
+                          nuevoEstado, 
+                          pedido.customer_info?.phone, 
+                          pedido.customer_info?.name
+                        )
+                      }
                     />
                   )}
                 </div>

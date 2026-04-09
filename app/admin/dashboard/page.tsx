@@ -75,15 +75,33 @@ export default function Dashboard() {
     };
   }, [router]);
 
-  const updateOrderStatus = async (orderId: string, newStatus: string) => {
+  const updateOrderStatus = async (orderId: string, newStatus: string, customerPhone?: string, customerName?: string) => {
     try {
-      const { error } = await supabase.from('orders').update({ status: newStatus, updated_at: new Date().toISOString() }).eq('id', orderId);
+      const { error } = await supabase
+        .from('orders')
+        .update({ status: newStatus, updated_at: new Date().toISOString() })
+        .eq('id', orderId);
+
       if (error) throw error;
-      // No necesitamos actualizar el estado manualmente aquí porque el realtime lo hará por nosotros, 
-      // pero dejarlo hace que la interfaz se sienta más rápida (Optimistic UI)
-      setPedidos(prev => prev.map(p => p.id === orderId ? { ...p, status: newStatus, updated_at: new Date().toISOString() } : p));
+
       toast.success(`Pedido movido a ${newStatus}`);
-    } catch (e: any) { toast.error(e.message); }
+
+      // 🔥 DICCIONARIO DE MENSAJES PERSONALIZADOS
+      const mensajes: Record<string, string> = {
+        'En preparación': `¡Buenas noticias, ${customerName}! ✨ Tu pedido en *VeciStore* ya está en manos de nuestros creadores. Estamos cuidando cada detalle para que quede perfecto. 🧶🛠️`,
+        'Enviado': `¡Atención ${customerName}! 🚀 Tu pedido ha salido de nuestro taller y va camino a tu dirección. ¡Prepárate para recibir algo increíble! 📦💨`,
+        'Entregado': `¡Hola ${customerName}! 🌟 Según nuestros registros, ya tienes tu pedido contigo. ¡Esperamos que lo disfrutes muchísimo! No olvides etiquetarnos en redes sociales. 📸💖`,
+      };
+
+      // Si el estado tiene un mensaje definido, abrimos WhatsApp
+      if (customerPhone && mensajes[newStatus]) {
+        const url = `https://wa.me/${customerPhone}?text=${encodeURIComponent(mensajes[newStatus])}`;
+        window.open(url, '_blank');
+      }
+
+    } catch (e: any) { 
+      toast.error(e.message); 
+    }
   };
 
   if (loading) return <div className="py-32 text-center animate-pulse text-zinc-500 font-medium text-sm">Cargando Centro de Inteligencia...</div>;
