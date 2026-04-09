@@ -2,7 +2,7 @@
 
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { toast } from 'sonner';
-import { supabase } from '../lib/supabase'; // Conexión a la BD
+import { supabase } from '../lib/supabase';
 
 interface AppContextType {
   cart: any[];
@@ -13,6 +13,10 @@ interface AppContextType {
   favorites: any[];
   toggleFavorite: (product: any) => void;
   user: any | null;
+  // 🔥 NUEVOS ESTADOS PARA EL CARRITO DESLIZANTE
+  isCartOpen: boolean;
+  openCart: () => void;
+  closeCart: () => void;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -21,11 +25,13 @@ export function Providers({ children }: { children: ReactNode }) {
   const [cart, setCart] = useState<any[]>([]);
   const [favorites, setFavorites] = useState<any[]>([]);
   const [user, setUser] = useState<any | null>(null);
-  
-  // Usamos esta bandera para saber cuándo ya cargamos los datos guardados
   const [isInitialized, setIsInitialized] = useState(false);
+  
+  // 🔥 ESTADO DEL PANEL DEL CARRITO
+  const [isCartOpen, setIsCartOpen] = useState(false);
+  const openCart = () => setIsCartOpen(true);
+  const closeCart = () => setIsCartOpen(false);
 
-  // 1. RECUPERAR DATOS: Al entrar a la app, buscamos si había algo guardado
   useEffect(() => {
     const carritoGuardado = localStorage.getItem('veciStore_cart');
     const favoritosGuardados = localStorage.getItem('veciStore_favorites');
@@ -36,7 +42,6 @@ export function Providers({ children }: { children: ReactNode }) {
     setIsInitialized(true);
   }, []);
 
-  // 2. GUARDAR DATOS: Cada vez que el carrito o favoritos cambian, los guardamos
   useEffect(() => {
     if (isInitialized) {
       localStorage.setItem('veciStore_cart', JSON.stringify(cart));
@@ -44,7 +49,6 @@ export function Providers({ children }: { children: ReactNode }) {
     }
   }, [cart, favorites, isInitialized]);
 
-  // 3. SESIÓN DE USUARIO (Se mantiene intacto)
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => setUser(session?.user ?? null));
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
@@ -62,6 +66,7 @@ export function Providers({ children }: { children: ReactNode }) {
       return [...prev, { ...product, cantidad: 1 }];
     });
     toast.success(`${product.title} agregado al carrito 🛒`);
+    openCart(); // 🔥 Abre el panel automáticamente al agregar algo
   };
 
   const updateQuantity = (id: string, nuevaCantidad: number) => {
@@ -76,7 +81,7 @@ export function Providers({ children }: { children: ReactNode }) {
 
   const clearCart = () => {
     setCart([]);
-    localStorage.removeItem('veciStore_cart'); // Limpiamos también la memoria
+    localStorage.removeItem('veciStore_cart');
   };
 
   const toggleFavorite = (product: any) => {
@@ -92,7 +97,11 @@ export function Providers({ children }: { children: ReactNode }) {
   };
 
   return (
-    <AppContext.Provider value={{ cart, addToCart, updateQuantity, removeFromCart, clearCart, favorites, toggleFavorite, user }}>
+    <AppContext.Provider value={{ 
+      cart, addToCart, updateQuantity, removeFromCart, clearCart, 
+      favorites, toggleFavorite, user,
+      isCartOpen, openCart, closeCart // 🔥 Exportamos las funciones
+    }}>
       {children}
     </AppContext.Provider>
   );
