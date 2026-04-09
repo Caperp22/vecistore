@@ -9,7 +9,7 @@ import OrdersTab from '@/components/admin/OrdersTab';
 import MetricsTab from '@/components/admin/MetricsTab';
 import InventoryTab from '@/components/admin/InventoryTab';
 import CategoriesTab from '@/components/admin/CategoriesTab';
-import SubcategoriesTab from '@/components/admin/SubcategoriesTab'; // 🔥 1. IMPORTAR
+import SubcategoriesTab from '@/components/admin/SubcategoriesTab';
 
 export default function Dashboard() {
   const router = useRouter();
@@ -22,6 +22,7 @@ export default function Dashboard() {
   const [products, setProducts] = useState<any[]>([]);
 
   useEffect(() => {
+    // 1. Función para descargar todos los datos
     const fetchAdminData = async () => {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session || session.user.email !== 'caperp22@gmail.com') {
@@ -31,7 +32,7 @@ export default function Dashboard() {
 
       const [catsRes, subcatsRes, ordersRes, prodRes] = await Promise.all([
         supabase.from('categories').select('*').order('id', { ascending: true }),
-        supabase.from('subcategories').select('*').order('sort_order', { ascending: true }).order('name', { ascending: true }),
+        supabase.from('subcategories').select('*').order('name', { ascending: true }),
         supabase.from('orders').select('*').order('created_at', { ascending: false }),
         supabase.from('products').select('*, categories(name)').order('created_at', { ascending: false })
       ]);
@@ -43,13 +44,43 @@ export default function Dashboard() {
       
       setLoading(false);
     };
+
+    // Carga inicial
     fetchAdminData();
+
+    // 🔥 2. TRANSMISIÓN EN VIVO PARA EL ADMINISTRADOR 🔥
+    const channel = supabase.channel('admin-realtime')
+      // Escuchar NUEVOS PEDIDOS
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'orders' }, (payload) => {
+        // Mostramos la notificación obligatoria
+        toast.success('¡Nuevo pedido recibido! 🛍️', {
+          description: 'El panel y las métricas se han actualizado al instante.',
+          duration: 6000,
+        });
+        // Recargamos los datos
+        fetchAdminData();
+      })
+      // Escuchar actualizaciones de pedidos (ej. si el cliente lo cancela o cambia de estado)
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'orders' }, () => {
+        fetchAdminData();
+      })
+      // Escuchar cambios en inventario para que también se actualice solo
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'products' }, () => fetchAdminData())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'categories' }, () => fetchAdminData())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'subcategories' }, () => fetchAdminData())
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [router]);
 
   const updateOrderStatus = async (orderId: string, newStatus: string) => {
     try {
       const { error } = await supabase.from('orders').update({ status: newStatus, updated_at: new Date().toISOString() }).eq('id', orderId);
       if (error) throw error;
+      // No necesitamos actualizar el estado manualmente aquí porque el realtime lo hará por nosotros, 
+      // pero dejarlo hace que la interfaz se sienta más rápida (Optimistic UI)
       setPedidos(prev => prev.map(p => p.id === orderId ? { ...p, status: newStatus, updated_at: new Date().toISOString() } : p));
       toast.success(`Pedido movido a ${newStatus}`);
     } catch (e: any) { toast.error(e.message); }
@@ -68,7 +99,6 @@ export default function Dashboard() {
           </div>
         </div>
         
-        {/* 🔥 2. AGREGAR EL BOTÓN AL MENÚ 🔥 */}
         <div className="flex flex-wrap justify-center gap-2 bg-zinc-100 dark:bg-zinc-900/50 p-1 rounded-xl border border-zinc-200 dark:border-zinc-800">
           <button onClick={() => setActiveTab('orders')} className={`px-4 py-1.5 rounded-lg text-sm font-semibold transition-all ${activeTab === 'orders' ? 'bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white shadow-sm' : 'text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300'}`}>Pedidos</button>
           <button onClick={() => setActiveTab('metrics')} className={`px-4 py-1.5 rounded-lg text-sm font-semibold transition-all ${activeTab === 'metrics' ? 'bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white shadow-sm' : 'text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300'}`}>Métricas</button>
@@ -82,8 +112,6 @@ export default function Dashboard() {
       {activeTab === 'metrics' && <MetricsTab pedidos={pedidos} />}
       {activeTab === 'products' && <InventoryTab products={products} setProducts={setProducts} categories={categories} subcategories={subcategories} />}
       {activeTab === 'categories' && <CategoriesTab categories={categories} setCategories={setCategories} />}
-      
-      {/* 🔥 3. RENDERIZAR EL COMPONENTE 🔥 */}
       {activeTab === 'subcategories' && <SubcategoriesTab categories={categories} subcategories={subcategories} setSubcategories={setSubcategories} />}
 
     </div>

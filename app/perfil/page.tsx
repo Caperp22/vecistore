@@ -5,6 +5,7 @@ import { useAppContext } from '../../components/Providers';
 import { supabase } from '../../lib/supabase';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { toast } from 'sonner'; // 🔥 1. IMPORTAMOS TOAST
 
 export default function PerfilPage() {
   const { user } = useAppContext();
@@ -13,56 +14,85 @@ export default function PerfilPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-      let isMounted = true; // Para evitar errores si cambias de página rápido
+    let isMounted = true;
+    let channel: any = null; // 🔥 Variable para guardar la conexión en vivo
 
-      const traerPedidos = async (userId: string) => {
-        const { data } = await supabase
-          .from('orders')
-          .select('*')
-          .eq('user_id', userId)
-          .order('created_at', { ascending: false });
+    const traerPedidos = async (userId: string) => {
+      const { data } = await supabase
+        .from('orders')
+        .select('*')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false });
 
-        if (data && isMounted) setPedidos(data);
-        if (isMounted) setLoading(false);
-      };
+      if (data && isMounted) setPedidos(data);
+      if (isMounted) setLoading(false);
 
-      // 1. Escuchamos si la sesión "despierta" mientras carga
-      const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-        if (session?.user && isMounted) {
-          traerPedidos(session.user.id);
-        }
-      });
-
-      // 2. Revisión inicial con "Tolerancia Móvil"
-      const revisarConPaciencia = async () => {
-        const { data: { session } } = await supabase.auth.getSession();
-        
-        if (session?.user) {
-          // Si la encontró rápido, perfecto
-          traerPedidos(session.user.id);
-        } else {
-          // ¡EL SECRETO ESTÁ AQUÍ! No lo expulsamos de inmediato.
-          // Le damos 1000 milisegundos (1 seg) al celular para reaccionar.
-          setTimeout(async () => {
-            if (!isMounted) return;
-            const { data: { session: recheck } } = await supabase.auth.getSession();
-            
-            if (!recheck?.user) {
-              router.push('/login'); // Ahora sí, si después de 1 seg no hay nada, es que no está logueado
+      // 🔥 2. INICIAMOS LA TRANSMISIÓN EN VIVO (Solo si no se ha iniciado ya)
+      if (!channel) {
+        channel = supabase.channel(`realtime-pedidos-${userId}`)
+          .on(
+            'postgres_changes', 
+            { 
+              event: 'UPDATE', 
+              schema: 'public', 
+              table: 'orders',
+              filter: `user_id=eq.${userId}` // 🔒 CRÍTICO: Solo escucha los pedidos de ESTE usuario
+            }, 
+            async (payload) => {
+              // 🔔 Mostramos la notificación visual y sonora
+              toast.success('📦 ¡Actualización de tu pedido!', {
+                description: 'El estado de tu compra acaba de cambiar. ¡Revisa los detalles!',
+                duration: 6000,
+              });
+              
+              // 🔄 Volvemos a descargar los pedidos silenciosamente para actualizar la pantalla
+              const { data: newData } = await supabase
+                .from('orders')
+                .select('*')
+                .eq('user_id', userId)
+                .order('created_at', { ascending: false });
+                
+              if (newData && isMounted) setPedidos(newData);
             }
-          }, 1000); 
-        }
-      };
+          )
+          .subscribe();
+      }
+    };
 
-      revisarConPaciencia();
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (session?.user && isMounted) {
+        traerPedidos(session.user.id);
+      }
+    });
 
-      return () => {
-        isMounted = false;
-        subscription.unsubscribe();
-      };
-    }, [router]);
+    const revisarConPaciencia = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (session?.user) {
+        traerPedidos(session.user.id);
+      } else {
+        setTimeout(async () => {
+          if (!isMounted) return;
+          const { data: { session: recheck } } = await supabase.auth.getSession();
+          
+          if (!recheck?.user) {
+            router.push('/login');
+          }
+        }, 1000); 
+      }
+    };
 
-  // Pantalla de carga mejorada mientras Supabase verifica la sesión
+    revisarConPaciencia();
+
+    return () => {
+      isMounted = false;
+      subscription.unsubscribe();
+      // 🔥 3. CERRAMOS LA CONEXIÓN AL SALIR DE LA PÁGINA
+      if (channel) supabase.removeChannel(channel);
+    };
+  }, [router]);
+
+  // Pantalla de carga mejorada
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[50vh] animate-in fade-in duration-500">
@@ -118,7 +148,7 @@ export default function PerfilPage() {
                 
                 {/* Etiquetas Premium de Estado */}
                 <div className="flex flex-col items-start sm:items-end">
-                  <span className={`px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest inline-block w-max border
+                  <span className={`px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest inline-block w-max border transition-colors duration-500
                     ${pedido.status === 'Pendiente' ? 'bg-yellow-50 text-yellow-700 border-yellow-200 dark:bg-yellow-500/10 dark:text-yellow-400 dark:border-yellow-500/20' : 
                       pedido.status === 'En preparación' ? 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-500/10 dark:text-blue-400 dark:border-blue-500/20' : 
                       pedido.status === 'Enviado' ? 'bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-500/10 dark:text-purple-400 dark:border-purple-500/20' : 
@@ -129,7 +159,7 @@ export default function PerfilPage() {
                   
                   {/* Fecha de actualización */}
                   {pedido.status !== 'Pendiente' && pedido.updated_at && (
-                    <span className="text-[10px] text-zinc-400 dark:text-zinc-500 mt-2 font-bold uppercase tracking-wider">
+                    <span className="text-[10px] text-zinc-400 dark:text-zinc-500 mt-2 font-bold uppercase tracking-wider animate-in fade-in">
                       Actualizado: {new Date(pedido.updated_at).toLocaleDateString('es-CO')}
                     </span>
                   )}
