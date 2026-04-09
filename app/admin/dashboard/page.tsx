@@ -31,7 +31,7 @@ export default function Dashboard() {
 
       const [catsRes, subcatsRes, ordersRes, prodRes] = await Promise.all([
         supabase.from('categories').select('*').order('id', { ascending: true }),
-        supabase.from('subcategories').select('*').order('name', { ascending: true }),
+        supabase.from('subcategories').select('*').order('sort_order', { ascending: true }).order('name', { ascending: true }),
         supabase.from('orders').select('*').order('created_at', { ascending: false }),
         supabase.from('products').select('*, categories(name)').order('created_at', { ascending: false })
       ]);
