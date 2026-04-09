@@ -84,6 +84,13 @@ export default function Dashboard() {
 
       if (error) throw error;
 
+      // 🔥 ESTA ES LA LÍNEA CLAVE: Mueve la tarjeta al instante visualmente
+      setPedidos(prev => prev.map(p => 
+        p.id === orderId 
+          ? { ...p, status: newStatus, updated_at: new Date().toISOString() } 
+          : p
+      ));
+
       toast.success(`Pedido movido a ${newStatus}`);
 
       // 🔥 DICCIONARIO DE MENSAJES PERSONALIZADOS
