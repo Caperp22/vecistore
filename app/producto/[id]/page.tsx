@@ -5,11 +5,16 @@ import { useParams, useRouter } from 'next/navigation';
 import { supabase } from '../../../lib/supabase';
 import Link from 'next/link';
 import { toast } from 'sonner';
+// 🔥 1. IMPORTAMOS TU CONTEXTO GLOBAL DEL CARRITO 🔥
+import { useAppContext } from '../../../components/Providers';
 
 export default function ProductDetailPage() {
   const params = useParams();
   const router = useRouter();
   const id = params.id as string;
+
+  // 🔥 2. TRAEMOS LA FUNCIÓN PARA AÑADIR AL CARRITO 🔥
+  const { addToCart } = useAppContext();
 
   const [product, setProduct] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -19,7 +24,6 @@ export default function ProductDetailPage() {
     const fetchProduct = async () => {
       if (!id) return;
       
-      // Buscamos el producto por su ID e incluimos el nombre de su categoría
       const { data, error } = await supabase
         .from('products')
         .select('*, categories(name)')
@@ -37,9 +41,10 @@ export default function ProductDetailPage() {
     fetchProduct();
   }, [id]);
 
-  // Función temporal para simular añadir al carrito
+  // 🔥 3. CONECTAMOS LA LÓGICA REAL 🔥
   const handleAddToCart = () => {
-    // Aquí conectarás la lógica real de tu carrito (ej. Zustand, Context o Base de datos)
+    // Le pasamos el producto completo MÁS la cantidad que el usuario eligió
+    addToCart({ ...product, cantidad });
     toast.success(`Añadiste ${cantidad}x ${product.title} al carrito 🛒`);
   };
 
@@ -63,7 +68,6 @@ export default function ProductDetailPage() {
   return (
     <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-10 animate-in fade-in slide-in-from-bottom-4 duration-500">
       
-      {/* Botón de Volver */}
       <button 
         onClick={() => router.back()} 
         className="flex items-center gap-2 text-sm font-bold text-zinc-500 hover:text-zinc-900 dark:hover:text-white transition-colors mb-8 group"
@@ -77,14 +81,12 @@ export default function ProductDetailPage() {
       <div className="bg-white dark:bg-[#111] border border-zinc-200/80 dark:border-zinc-800/80 rounded-[2.5rem] p-6 md:p-10 shadow-sm">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-10 lg:gap-16 items-center">
           
-          {/* COLUMNA IZQUIERDA: IMAGEN */}
           <div className="relative aspect-square w-full rounded-[2rem] overflow-hidden bg-zinc-100 dark:bg-zinc-900 border border-zinc-200/50 dark:border-zinc-800/50">
             <img 
               src={product.image_url || 'https://via.placeholder.com/800?text=Sin+Imagen'} 
               alt={product.title} 
               className="absolute inset-0 w-full h-full object-cover hover:scale-105 transition-transform duration-700"
             />
-            {/* Etiquetas flotantes */}
             <div className="absolute top-4 left-4 flex flex-col gap-2 items-start">
               <span className="bg-black/70 backdrop-blur-md text-white text-[10px] font-black px-3 py-1.5 rounded-lg uppercase tracking-wider shadow-sm">
                 {product.categories?.name || 'General'}
@@ -97,7 +99,6 @@ export default function ProductDetailPage() {
             </div>
           </div>
 
-          {/* COLUMNA DERECHA: INFORMACIÓN */}
           <div className="flex flex-col h-full justify-center">
             
             <h1 className="text-3xl md:text-4xl lg:text-5xl font-black text-zinc-900 dark:text-white tracking-tight mb-4 leading-tight">
@@ -117,11 +118,9 @@ export default function ProductDetailPage() {
               </p>
             </div>
 
-            {/* CONTROLES DE COMPRA */}
             <div className="mt-auto space-y-4">
               <div className="flex gap-4">
                 
-                {/* Selector de Cantidad */}
                 <div className="flex items-center bg-zinc-50 dark:bg-[#0A0A0A] border border-zinc-200 dark:border-zinc-800 rounded-2xl p-1">
                   <button 
                     onClick={() => setCantidad(Math.max(1, cantidad - 1))}
@@ -140,7 +139,6 @@ export default function ProductDetailPage() {
                   </button>
                 </div>
 
-                {/* Botón Añadir al Carrito */}
                 <button 
                   onClick={handleAddToCart}
                   className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-lg rounded-2xl shadow-lg shadow-indigo-500/20 transition-all flex items-center justify-center gap-3 active:scale-[0.98]"
