@@ -6,7 +6,7 @@ import { useAppContext } from './Providers';
 import { supabase } from '../lib/supabase';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
-import { createPortal } from 'react-dom'; // 🔥 IMPORTAMOS LA MAGIA DEL PORTAL
+import { createPortal } from 'react-dom';
 
 export default function UserMenu() {
   const { user } = useAppContext();
@@ -22,11 +22,13 @@ export default function UserMenu() {
   const [direccion, setDireccion] = useState('');
   const [actualizando, setActualizando] = useState(false);
 
-  // 🔥 Variable para saber si el Portal ya puede funcionar en el navegador
   const [mounted, setMounted] = useState(false);
 
+  // 🔥 Verificamos si el usuario actual es el Administrador
+  const isAdmin = user?.email === 'caperp22@gmail.com';
+
   useEffect(() => {
-    setMounted(true); // Confirmamos que ya cargó la página
+    setMounted(true);
     if (user) {
       setNombre(user.user_metadata?.full_name || '');
       setTelefono(user.user_metadata?.phone || '');
@@ -97,6 +99,14 @@ export default function UserMenu() {
             </div>
             
             <div className="p-3 space-y-1">
+              
+              {/* 🔥 BOTÓN EXCLUSIVO DEL ADMINISTRADOR 🔥 */}
+              {isAdmin && (
+                <Link href="/admin/dashboard" onClick={() => setIsOpen(false)} className="flex items-center gap-3 px-4 py-3 rounded-2xl text-sm font-bold text-indigo-700 dark:text-indigo-300 bg-indigo-50 dark:bg-indigo-500/10 hover:bg-indigo-100 dark:hover:bg-indigo-500/20 transition-colors mb-2 border border-indigo-100 dark:border-indigo-500/20">
+                  <span className="text-lg">🚀</span> Panel Maestro
+                </Link>
+              )}
+
               <Link href="/perfil" onClick={() => setIsOpen(false)} className="flex items-center gap-3 px-4 py-3 rounded-2xl text-sm font-semibold text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-colors">
                 <span className="text-lg">🛍️</span> Mis Pedidos
               </Link>
@@ -114,7 +124,7 @@ export default function UserMenu() {
          </div>
       )}
 
-      {/* 🔥 MODAL TELETRANSPORTADO CON EL PORTAL 🔥 */}
+      {/* MODAL TELETRANSPORTADO CON EL PORTAL */}
       {isEditModalOpen && mounted && createPortal(
         <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in">
           <div className="bg-white dark:bg-[#111] border border-zinc-200 dark:border-zinc-800 rounded-3xl shadow-2xl max-w-md w-full overflow-hidden flex flex-col relative animate-in zoom-in-95">
@@ -143,7 +153,7 @@ export default function UserMenu() {
             </form>
           </div>
         </div>,
-        document.body // <- El destino del portal: Lo saca de la barra y lo dibuja al final de la página
+        document.body 
       )}
     </div>
   );
