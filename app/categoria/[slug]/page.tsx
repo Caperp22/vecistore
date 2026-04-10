@@ -62,13 +62,22 @@ export default function CategoryPage() {
     );
   }
 
+  // Obtenemos los datos completos de la subcategoría activa (para sacar su imagen y su emoji)
+  const activeSubcatData = activeSubcat ? subcategories.find(s => s.name === activeSubcat) : null;
   const filteredProducts = activeSubcat ? products.filter(p => p.subcategory === activeSubcat) : [];
+
+  // 🔥 LÓGICA DE LA IMAGEN DE PORTADA 🔥
+  // Si hay subcategoría activa y tiene imagen, usamos esa. Si no, usamos la de la categoría principal.
+  const bannerImageUrl = activeSubcatData?.banner_image_url || category.image_url || 'https://via.placeholder.com/1200x400?text=Portada';
 
   return (
     <div className="w-full pb-20 animate-in fade-in duration-500">
       
+      {/* 🔥 BANNER SUPERIOR DINÁMICO 🔥 */}
       <div className={`relative w-full rounded-[2.5rem] overflow-hidden mb-10 shadow-sm border border-zinc-200/50 dark:border-zinc-800/50 transition-all duration-500 ${activeSubcat ? 'h-40 sm:h-56' : 'h-64 sm:h-80'}`}>
-        <img src={category.image_url || 'https://via.placeholder.com/1200x400?text=Portada'} alt={category.name} className="absolute inset-0 w-full h-full object-cover" />
+        
+        {/* Usamos la variable bannerImageUrl que calculamos arriba */}
+        <img key={bannerImageUrl} src={bannerImageUrl} alt={activeSubcat ? activeSubcat : category.name} className="absolute inset-0 w-full h-full object-cover animate-in fade-in duration-500" />
         <div className="absolute inset-0 bg-black/60 backdrop-blur-[2px]"></div>
         
         <div className="absolute inset-0 flex flex-col justify-center items-center text-center p-6 z-10">
@@ -137,7 +146,7 @@ export default function CategoryPage() {
         <div className="animate-in slide-in-from-bottom-4 fade-in duration-500">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8 border-b border-zinc-200 dark:border-zinc-800 pb-4">
             <h2 className="text-2xl font-black text-zinc-900 dark:text-white tracking-tight flex items-center gap-3">
-              <span className="text-3xl">{subcategories.find(s => s.name === activeSubcat)?.icon || '✨'}</span> 
+              <span className="text-3xl">{activeSubcatData?.icon || '✨'}</span> 
               Catálogo de {activeSubcat}
             </h2>
             <button onClick={() => setActiveSubcat(null)} className="bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-900 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-300 px-5 py-2.5 rounded-xl text-sm font-bold transition-colors flex items-center gap-2 w-fit">

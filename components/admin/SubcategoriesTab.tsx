@@ -16,20 +16,43 @@ export default function SubcategoriesTab({
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingSub, setEditingSub] = useState<any | null>(null);
   const [loading, setLoading] = useState(false);
+  const [uploadingImage, setUploadingImage] = useState(false);
 
   // Campos del formulario
   const [name, setName] = useState('');
   const [categoryId, setCategoryId] = useState('');
   const [icon, setIcon] = useState('✨');
+  const [bannerImage, setBannerImage] = useState(''); // 🔥 NUEVO: Estado para la imagen
 
-  // 🔥 ESTADOS PARA EL DRAG AND DROP
+  // Estados para el Drag and Drop
   const [draggedItem, setDraggedItem] = useState<any | null>(null);
   const [isSavingOrder, setIsSavingOrder] = useState(false);
+
+  // --- 🔥 FUNCIÓN PARA SUBIR IMAGEN ---
+  const handleImageUpload = async (file: File) => {
+    try {
+      setUploadingImage(true);
+      const fileExt = file.name.split('.').pop();
+      const fileName = `subcat-banner-${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
+      const filePath = `subcategorias/${fileName}`;
+
+      const { error: uploadError } = await supabase.storage.from('tienda-images').upload(filePath, file);
+      if (uploadError) throw uploadError;
+
+      const { data } = supabase.storage.from('tienda-images').getPublicUrl(filePath);
+      setBannerImage(data.publicUrl);
+      toast.success('Imagen de fondo subida con éxito 📸');
+    } catch (err: any) {
+      toast.error('Error al subir imagen: ' + err.message);
+    } finally {
+      setUploadingImage(false);
+    }
+  };
 
   // --- LÓGICA DE FORMULARIO ---
   const openNewModal = () => {
     setEditingSub(null);
-    setName(''); setCategoryId(''); setIcon('✨');
+    setName(''); setCategoryId(''); setIcon('✨'); setBannerImage('');
     setIsModalOpen(true);
   };
 
@@ -38,6 +61,7 @@ export default function SubcategoriesTab({
     setName(sub.name);
     setCategoryId(sub.category_id.toString());
     setIcon(sub.icon || '✨');
+    setBannerImage(sub.banner_image_url || ''); // Cargar imagen existente
     setIsModalOpen(true);
   };
 
@@ -49,18 +73,17 @@ export default function SubcategoriesTab({
 
     try {
       if (editingSub) {
-        const subData = { name, slug, category_id: parseInt(categoryId), icon: icon || '✨' };
+        const subData = { name, slug, category_id: parseInt(categoryId), icon: icon || '✨', banner_image_url: bannerImage };
         const { error } = await supabase.from('subcategories').update(subData).eq('id', editingSub.id);
         if (error) throw error;
         
         setSubcategories((prev: any[]) => prev.map(s => s.id === editingSub.id ? { ...s, ...subData } : s));
         toast.success('Subcategoría actualizada ✏️');
       } else {
-        // 🔥 Si es nueva, buscamos el orden más alto de esa categoría y le sumamos 1 para ponerla al final
         const categorySubs = subcategories.filter(s => s.category_id === parseInt(categoryId));
         const maxOrder = categorySubs.length > 0 ? Math.max(...categorySubs.map(s => s.sort_order || 0)) : -1;
         
-        const subData = { name, slug, category_id: parseInt(categoryId), icon: icon || '✨', sort_order: maxOrder + 1 };
+        const subData = { name, slug, category_id: parseInt(categoryId), icon: icon || '✨', sort_order: maxOrder + 1, banner_image_url: bannerImage };
         
         const { data, error } = await supabase.from('subcategories').insert([subData]).select();
         if (error) throw error;
@@ -87,10 +110,9 @@ export default function SubcategoriesTab({
     }
   };
 
-  // --- 🔥 LÓGICA DE DRAG AND DROP (ARRASTRAR Y SOLTAR) 🔥 ---
+  // --- LÓGICA DE DRAG AND DROP ---
   const handleDragStart = (e: React.DragEvent, sub: any) => {
     setDraggedItem(sub);
-    // Efecto visual al arrastrar
     e.dataTransfer.effectAllowed = 'move';
     e.currentTarget.classList.add('opacity-50');
   };
@@ -101,7 +123,7 @@ export default function SubcategoriesTab({
   };
 
   const handleDragOver = (e: React.DragEvent) => {
-    e.preventDefault(); // Necesario para permitir el "Drop"
+    e.preventDefault(); 
   };
 
   const handleDrop = async (e: React.DragEvent, targetSub: any, catId: number) => {
@@ -113,36 +135,25 @@ export default function SubcategoriesTab({
     }
 
     setIsSavingOrder(true);
-
-    // 1. Obtener la lista actual de esa categoría ordenada
-    const list = subcategories
-      .filter(s => s.category_id === catId)
-      .sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
-
-    // 2. Encontrar índices
+    const list = subcategories.filter(s => s.category_id === catId).sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
     const draggedIndex = list.findIndex(s => s.id === draggedItem.id);
     const targetIndex = list.findIndex(s => s.id === targetSub.id);
 
-    // 3. Reordenar el arreglo
     const newList = [...list];
-    newList.splice(draggedIndex, 1); // Quitamos el item arrastrado
-    newList.splice(targetIndex, 0, draggedItem); // Lo insertamos en la nueva posición
+    newList.splice(draggedIndex, 1); 
+    newList.splice(targetIndex, 0, draggedItem); 
 
-    // 4. Asignar nuevos números de orden (0, 1, 2, 3...)
     const updatedItems = newList.map((item, index) => ({ ...item, sort_order: index }));
 
-    // 5. Actualización Optimista (Reflejar en pantalla de inmediato para que se vea rápido)
     setSubcategories((prev: any[]) => {
       const otrasCategorias = prev.filter(s => s.category_id !== catId);
       return [...otrasCategorias, ...updatedItems];
     });
 
-    // 6. Guardar los nuevos órdenes en la base de datos (silenciosamente)
     try {
       await Promise.all(updatedItems.map(item => 
         supabase.from('subcategories').update({ sort_order: item.sort_order }).eq('id', item.id)
       ));
-      // toast.success('Orden guardado'); // Opcional: Lo oculto para que no sea molesto cada vez que mueves algo
     } catch (error) {
       toast.error('Hubo un error al guardar el orden en la base de datos.');
     } finally {
@@ -154,7 +165,6 @@ export default function SubcategoriesTab({
   return (
     <div className="animate-in fade-in duration-300 relative">
       
-      {/* Indicador de guardado global para el drag and drop */}
       {isSavingOrder && (
         <div className="absolute top-0 right-0 bg-indigo-500 text-white text-xs font-bold px-3 py-1 rounded-full animate-pulse shadow-md z-10">
           Guardando orden...
@@ -173,7 +183,6 @@ export default function SubcategoriesTab({
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
         {categories.map(cat => {
-          // Filtramos y ordenamos localmente para dibujar la lista de esta columna
           const catSubs = subcategories
             .filter(s => s.category_id === cat.id)
             .sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
@@ -193,7 +202,7 @@ export default function SubcategoriesTab({
                     catSubs.map(sub => (
                       <div 
                         key={sub.id} 
-                        draggable // 🔥 HACEMOS LA TARJETA ARRASTRABLE
+                        draggable 
                         onDragStart={(e) => handleDragStart(e, sub)}
                         onDragEnd={handleDragEnd}
                         onDragOver={handleDragOver}
@@ -203,13 +212,14 @@ export default function SubcategoriesTab({
                         `}
                       >
                         <div className="flex items-center gap-3">
-                          {/* Agarradera visual */}
                           <div className="text-zinc-300 dark:text-zinc-600 cursor-grab hover:text-zinc-500 active:cursor-grabbing px-1">
                             ⋮⋮
                           </div>
                           <span className="text-xl bg-zinc-100 dark:bg-zinc-800 w-8 h-8 rounded-lg flex items-center justify-center pointer-events-none select-none">{sub.icon || '✨'}</span>
                           <div>
                             <span className="text-sm font-semibold text-zinc-700 dark:text-zinc-300 block leading-tight pointer-events-none select-none">{sub.name}</span>
+                            {/* Pequeño indicador si tiene imagen configurada */}
+                            {sub.banner_image_url && <span className="text-[9px] font-bold text-indigo-500 uppercase tracking-wider">🖼️ Con Fondo</span>}
                           </div>
                         </div>
 
@@ -233,14 +243,15 @@ export default function SubcategoriesTab({
 
       {isModalOpen && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in">
-          <div className="bg-white dark:bg-[#111] border border-zinc-200 dark:border-zinc-800 rounded-3xl shadow-2xl max-w-sm w-full overflow-hidden flex flex-col relative animate-in zoom-in-95">
+          <div className="bg-white dark:bg-[#111] border border-zinc-200 dark:border-zinc-800 rounded-3xl shadow-2xl max-w-md w-full overflow-hidden flex flex-col relative animate-in zoom-in-95">
             <div className="p-6 border-b border-zinc-100 dark:border-zinc-800/80 flex justify-between items-center">
               <h2 className="text-xl font-bold">{editingSub ? 'Editar' : 'Nueva'} Subcategoría</h2>
               <button onClick={() => setIsModalOpen(false)} className="text-zinc-400 hover:text-zinc-600">
                 <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
               </button>
             </div>
-            <form onSubmit={handleSubmit} className="p-6 space-y-4">
+            
+            <form onSubmit={handleSubmit} className="p-6 space-y-4 max-h-[80vh] overflow-y-auto">
               <div>
                 <label className="text-[10px] font-bold uppercase text-zinc-400 mb-1 block px-1">Categoría Padre</label>
                 <select value={categoryId} onChange={e => setCategoryId(e.target.value)} className="w-full p-3 bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl outline-none focus:border-indigo-500 text-sm" required>
@@ -259,7 +270,29 @@ export default function SubcategoriesTab({
                 </div>
               </div>
               
-              <button type="submit" disabled={loading} className="w-full bg-indigo-600 text-white p-3.5 rounded-xl font-bold text-sm shadow-lg shadow-indigo-500/20 hover:bg-indigo-700 disabled:opacity-50 transition-all mt-2">
+              {/* 🔥 NUEVO CAMPO DE IMAGEN EN EL MODAL 🔥 */}
+              <div>
+                <label className="text-[10px] font-bold uppercase text-zinc-400 mb-1 block px-1">Banner de Fondo (Opcional)</label>
+                {bannerImage && (
+                  <div className="h-24 w-full rounded-xl overflow-hidden mb-2 border border-zinc-200 dark:border-zinc-800 relative group">
+                    <img src={bannerImage} alt="Banner" className="w-full h-full object-cover" />
+                    <button type="button" onClick={() => setBannerImage('')} className="absolute top-2 right-2 bg-red-500 text-white p-1 rounded-md opacity-0 group-hover:opacity-100 transition-opacity text-xs font-bold">Quitar</button>
+                  </div>
+                )}
+                <div className="relative">
+                  <input 
+                    type="file" accept="image/*"
+                    onChange={(e) => { if (e.target.files && e.target.files.length > 0) handleImageUpload(e.target.files[0]); }}
+                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                    disabled={uploadingImage}
+                  />
+                  <div className={`w-full p-3 rounded-xl flex items-center justify-center gap-2 font-bold text-xs transition-all border-2 border-dashed ${uploadingImage ? 'bg-indigo-50 dark:bg-indigo-900/20 text-indigo-400 border-indigo-200 dark:border-indigo-800' : 'bg-zinc-50 dark:bg-zinc-900 border-zinc-300 dark:border-zinc-700 hover:border-indigo-500 text-zinc-600 dark:text-zinc-300'}`}>
+                    {uploadingImage ? 'Subiendo...' : '📥 Subir Imagen desde PC'}
+                  </div>
+                </div>
+              </div>
+
+              <button type="submit" disabled={loading || uploadingImage} className="w-full bg-indigo-600 text-white p-3.5 rounded-xl font-bold text-sm shadow-lg shadow-indigo-500/20 hover:bg-indigo-700 disabled:opacity-50 transition-all mt-4">
                 {loading ? 'Guardando...' : 'Guardar Subcategoría'}
               </button>
             </form>
