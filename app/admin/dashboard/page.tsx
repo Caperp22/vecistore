@@ -12,6 +12,7 @@ import CategoriesTab from '@/components/admin/CategoriesTab';
 import SubcategoriesTab from '@/components/admin/SubcategoriesTab';
 // 🔥 1. IMPORTACIÓN DE LA NUEVA PESTAÑA
 import WhatsappTab from '@/components/admin/WhatsappTab'; 
+import BackgroundsTab from '@/components/admin/BackgroundsTab';
 
 export default function Dashboard() {
   const router = useRouter();
@@ -126,6 +127,7 @@ export default function Dashboard() {
           <button onClick={() => setActiveTab('categories')} className={`px-4 py-1.5 rounded-lg text-sm font-semibold transition-all ${activeTab === 'categories' ? 'bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white shadow-sm' : 'text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300'}`}>Categorías</button>
           {/* 🔥 6. EL NUEVO BOTÓN */}
           <button onClick={() => setActiveTab('whatsapp')} className={`px-4 py-1.5 rounded-lg text-sm font-semibold transition-all ${activeTab === 'whatsapp' ? 'bg-white dark:bg-green-900/30 text-green-600 dark:text-green-400 border border-green-200 dark:border-green-500/30 shadow-sm' : 'text-zinc-500 hover:text-green-600 dark:hover:text-green-400'}`}>Mensajes WA</button>
+          <button onClick={() => setActiveTab('backgrounds')} className={`px-4 py-1.5 rounded-lg text-sm font-semibold transition-all ${activeTab === 'backgrounds' ? 'bg-white dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 border border-purple-200 dark:border-purple-500/30 shadow-sm' : 'text-zinc-500 hover:text-purple-600 dark:hover:text-purple-400'}`}>🎨 Fondos de Página</button>
         </div>
       </div>
 
@@ -136,6 +138,7 @@ export default function Dashboard() {
       {activeTab === 'subcategories' && <SubcategoriesTab categories={categories} subcategories={subcategories} setSubcategories={setSubcategories} />}
       {/* 🔥 7. EL COMPONENTE DE EDICIÓN */}
       {activeTab === 'whatsapp' && <WhatsappTab templates={waTemplates} setTemplates={setWaTemplates} />}
+      {activeTab === 'backgrounds' && <BackgroundsTab />}
 
     </div>
   );

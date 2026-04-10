@@ -9,6 +9,7 @@ import { Toaster } from 'sonner';
 import { useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { useRouter } from 'next/navigation';
+import GlobalBackground from '@/components/GlobalBackground';
 
 const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
 const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"] });
@@ -42,6 +43,9 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
           <Providers>
             {/* Toaster posicionado para ser visible en móvil también */}
             <Toaster position="top-center" richColors theme="system" /> 
+            
+            {/* 🔥 Nuestro nuevo fondo dinámico global */}
+            <GlobalBackground />
             
             <Navbar />
             
