@@ -47,8 +47,8 @@ export default function GlobalBackground() {
         className="absolute inset-0 bg-cover bg-center transition-all duration-1000 scale-105"
         style={{ backgroundImage: `url(${bgUrl})` }}
       />
-      {/* El efecto translúcido intenso para que se puedan leer los textos de la página */}
-      <div className="absolute inset-0 bg-white/85 dark:bg-[#0A0A0A]/90 backdrop-blur-md" />
+      {/* El efecto translúcido (Reduje la opacidad de 85 a 60 en claro, y de 90 a 70 en oscuro) */}
+      <div className="absolute inset-0 bg-white/60 dark:bg-[#0A0A0A]/70 backdrop-blur-[6px]" />
     </div>
   );
 }
