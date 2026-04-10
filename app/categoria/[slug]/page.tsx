@@ -34,10 +34,8 @@ export default function CategoryPage() {
       setLoading(false);
     };
     
-    // 1. Carga inicial
     fetchData();
 
-    // 🔥 2. SUSCRIPCIÓN MULTI-TABLA EN TIEMPO REAL 🔥
     const channel = supabase.channel('category-realtime')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'categories' }, () => { fetchData(); })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'subcategories' }, () => { fetchData(); })
@@ -62,26 +60,30 @@ export default function CategoryPage() {
     );
   }
 
-  // Obtenemos los datos completos de la subcategoría activa (para sacar su imagen y su emoji)
   const activeSubcatData = activeSubcat ? subcategories.find(s => s.name === activeSubcat) : null;
   const filteredProducts = activeSubcat ? products.filter(p => p.subcategory === activeSubcat) : [];
 
-  // 🔥 LÓGICA DE LA IMAGEN DE PORTADA 🔥
-  // Si hay subcategoría activa y tiene imagen, usamos esa. Si no, usamos la de la categoría principal.
   const bannerImageUrl = activeSubcatData?.banner_image_url || category.image_url || 'https://via.placeholder.com/1200x400?text=Portada';
 
   return (
     <div className="w-full pb-20 animate-in fade-in duration-500">
       
-      {/* 🔥 BANNER SUPERIOR DINÁMICO 🔥 */}
-      <div className={`relative w-full rounded-[2.5rem] overflow-hidden mb-10 shadow-sm border border-zinc-200/50 dark:border-zinc-800/50 transition-all duration-500 ${activeSubcat ? 'h-40 sm:h-56' : 'h-64 sm:h-80'}`}>
+      {/* 🔥 BANNER SUPERIOR DINÁMICO MEJORADO 🔥 */}
+      {/* Se aumentó la altura (h-56 sm:h-72) para que las fotos luzcan mejor */}
+      <div className={`relative w-full rounded-[2.5rem] overflow-hidden mb-10 shadow-sm border border-zinc-200/50 dark:border-zinc-800/50 transition-all duration-500 ${activeSubcat ? 'h-56 sm:h-72' : 'h-64 sm:h-80'}`}>
         
-        {/* Usamos la variable bannerImageUrl que calculamos arriba */}
-        <img key={bannerImageUrl} src={bannerImageUrl} alt={activeSubcat ? activeSubcat : category.name} className="absolute inset-0 w-full h-full object-cover animate-in fade-in duration-500" />
-        <div className="absolute inset-0 bg-black/60 backdrop-blur-[2px]"></div>
+        {/* CAPA 1: Fondo borroso para rellenar huecos si la foto es cuadrada o vertical */}
+        <img key={`bg-${bannerImageUrl}`} src={bannerImageUrl} className="absolute inset-0 w-full h-full object-cover blur-xl opacity-60 scale-110" alt="" />
         
-        <div className="absolute inset-0 flex flex-col justify-center items-center text-center p-6 z-10">
-          <p className="text-indigo-400 font-bold tracking-widest uppercase text-xs sm:text-sm mb-2 drop-shadow-md">
+        {/* CAPA 2: Imagen real en object-contain para asegurar que se vea 100% COMPLETA sin recortes */}
+        <img key={bannerImageUrl} src={bannerImageUrl} alt={activeSubcat ? activeSubcat : category.name} className="absolute inset-0 w-full h-full object-contain animate-in fade-in duration-500 z-0" />
+        
+        {/* CAPA 3: Oscurecimiento para que el texto blanco se lea bien */}
+        <div className="absolute inset-0 bg-black/50 backdrop-blur-[2px] z-10"></div>
+        
+        {/* CAPA 4: El texto */}
+        <div className="absolute inset-0 flex flex-col justify-center items-center text-center p-6 z-20">
+          <p className="text-indigo-300 font-bold tracking-widest uppercase text-xs sm:text-sm mb-2 drop-shadow-md">
             {activeSubcat ? 'Explorando subcategoría' : 'Colección principal'}
           </p>
           <h1 className="text-4xl sm:text-6xl font-black text-white drop-shadow-xl tracking-tight flex items-center gap-4">
@@ -89,7 +91,7 @@ export default function CategoryPage() {
             {activeSubcat && (
               <>
                 <span className="text-zinc-500 hidden sm:inline">/</span>
-                <span className="text-indigo-300">{activeSubcat}</span>
+                <span className="text-indigo-200">{activeSubcat}</span>
               </>
             )}
           </h1>
