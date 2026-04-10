@@ -10,13 +10,12 @@ export default function GlobalBackground() {
 
   useEffect(() => {
     const fetchBackground = async () => {
-      // 1. Si es el administrador, no ponemos fondo para mantenerlo limpio para trabajar
       if (pathname.startsWith('/admin')) {
         setBgUrl('');
         return;
       }
 
-      // 2. Si es una categoría, buscamos el banner de ESA categoría
+      // 🔥 Fondos para Categorías
       if (pathname.startsWith('/categoria/')) {
         const slug = pathname.split('/')[2];
         const { data } = await supabase.from('categories').select('banner_image_url').eq('slug', slug).single();
@@ -26,12 +25,21 @@ export default function GlobalBackground() {
         }
       }
 
-      // 3. Si es una página normal (Inicio, Carrito, Perfil)
+      // 🔥 Fondos para Detalle de Producto
+      if (pathname.startsWith('/producto/')) {
+        const { data } = await supabase.from('page_backgrounds').select('image_url').eq('route', '/producto').single();
+        if (data?.image_url) {
+          setBgUrl(data.image_url);
+          return;
+        }
+      }
+
+      // 🔥 Fondos Globales (Inicio, Login, Carrito, etc)
       const { data } = await supabase.from('page_backgrounds').select('image_url').eq('route', pathname).single();
       if (data?.image_url) {
         setBgUrl(data.image_url);
       } else {
-        setBgUrl(''); // Fondo por defecto si no hay nada
+        setBgUrl(''); 
       }
     };
 
@@ -42,12 +50,10 @@ export default function GlobalBackground() {
 
   return (
     <div className="fixed inset-0 z-[-1] pointer-events-none transition-opacity duration-1000 ease-in-out">
-      {/* La imagen de fondo */}
       <div 
         className="absolute inset-0 bg-cover bg-center transition-all duration-1000 scale-105"
         style={{ backgroundImage: `url(${bgUrl})` }}
       />
-      {/* El efecto translúcido (Reduje la opacidad de 85 a 60 en claro, y de 90 a 70 en oscuro) */}
       <div className="absolute inset-0 bg-white/60 dark:bg-[#0A0A0A]/70 backdrop-blur-[6px]" />
     </div>
   );
