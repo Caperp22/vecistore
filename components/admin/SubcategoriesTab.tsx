@@ -1,248 +1,373 @@
 'use client';
 
-import { useState } from 'react';
-import { supabase } from '../../lib/supabase';
-import { toast } from 'sonner';
-// Importamos los componentes de Drag and Drop
-import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd';
 
-export default function SubcategoriesTab({ categories, subcategories, setSubcategories }: { categories: any[], subcategories: any[], setSubcategories: any }) {
-  const [newSubcategory, setNewSubcategory] = useState({ name: '', slug: '', category_id: '' });
-  const [editingSubcategory, setEditingSubcategory] = useState<any>(null);
+
+import { useState } from 'react';
+
+import { supabase } from '../../lib/supabase';
+
+import { toast } from 'sonner';
+
+
+
+export default function SubcategoriesTab({
+
+  categories,
+
+  subcategories,
+
+  setSubcategories
+
+}: {
+
+  categories: any[],
+
+  subcategories: any[],
+
+  setSubcategories: any
+
+}) {
+
+  const [isModalOpen, setIsModalOpen] = useState(false);
+
+  const [editingSub, setEditingSub] = useState<any | null>(null);
+
   const [loading, setLoading] = useState(false);
 
-  const handleCreate = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newSubcategory.category_id) return toast.error('Por favor selecciona una Categoría Padre');
-    
-    // Asignamos un sort_order inicial basado en la cantidad de subcategorías existentes en esa categoría
-    const countInCat = subcategories.filter(s => s.category_id === newSubcategory.category_id).length;
-    
-    setLoading(true);
-    try {
-      const { data, error } = await supabase.from('subcategories').insert([{...newSubcategory, sort_order: countInCat}]).select();
-      if (error) throw error;
-      if (data) {
-        setSubcategories([...subcategories, data[0]]);
-        setNewSubcategory({ name: '', slug: '', category_id: '' });
-        toast.success('Subcategoría creada con éxito');
-      }
-    } catch (err: any) { toast.error(err.message); } 
-    finally { setLoading(false); }
+
+
+  // Campos del formulario
+
+  const [name, setName] = useState('');
+
+  const [categoryId, setCategoryId] = useState('');
+
+  const [icon, setIcon] = useState('✨'); // 🔥 Nuevo
+
+  const [sortOrder, setSortOrder] = useState('0'); // 🔥 Nuevo
+
+
+
+  const openNewModal = () => {
+
+    setEditingSub(null);
+
+    setName(''); setCategoryId(''); setIcon('✨'); setSortOrder('0');
+
+    setIsModalOpen(true);
+
   };
 
-  const handleUpdate = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-    try {
-      const { error } = await supabase.from('subcategories').update({
-        name: editingSubcategory.name, 
-        slug: editingSubcategory.slug,
-        category_id: editingSubcategory.category_id
-      }).eq('id', editingSubcategory.id);
-      
-      if (error) throw error;
-      
-      setSubcategories(subcategories.map(s => s.id === editingSubcategory.id ? editingSubcategory : s));
-      setEditingSubcategory(null);
-      toast.success('Subcategoría actualizada');
-    } catch (err: any) { toast.error(err.message); } 
-    finally { setLoading(false); }
+
+
+  const openEditModal = (sub: any) => {
+
+    setEditingSub(sub);
+
+    setName(sub.name);
+
+    setCategoryId(sub.category_id.toString());
+
+    setIcon(sub.icon || '✨');
+
+    setSortOrder(sub.sort_order?.toString() || '0');
+
+    setIsModalOpen(true);
+
   };
+
+
+
+  const handleSubmit = async (e: React.FormEvent) => {
+
+    e.preventDefault();
+
+    setLoading(true);
+
+
+
+    const slug = name.toLowerCase().trim().replace(/[^\w\s-]/g, '').replace(/[\s_-]+/g, '-').replace(/^-+|-+$/g, '');
+
+
+
+    const subData = {
+
+      name,
+
+      slug,
+
+      category_id: parseInt(categoryId),
+
+      icon: icon || '✨',
+
+      sort_order: parseInt(sortOrder) || 0
+
+    };
+
+
+
+    try {
+
+      if (editingSub) {
+
+        const { error } = await supabase.from('subcategories').update(subData).eq('id', editingSub.id);
+
+        if (error) throw error;
+
+        // Actualizamos y reordenamos el estado localmente
+
+        setSubcategories((prev: any[]) => {
+
+          const updated = prev.map(s => s.id === editingSub.id ? { ...s, ...subData } : s);
+
+          return updated.sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+
+        });
+
+        toast.success('Subcategoría actualizada ✏️');
+
+      } else {
+
+        const { data, error } = await supabase.from('subcategories').insert([subData]).select();
+
+        if (error) throw error;
+
+        if (data) {
+
+          setSubcategories((prev: any[]) => {
+
+            const updated = [...prev, data[0]];
+
+            return updated.sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+
+          });
+
+        }
+
+        toast.success('Nueva subcategoría creada 📁');
+
+      }
+
+      setIsModalOpen(false);
+
+    } catch (err: any) {
+
+      toast.error(err.message);
+
+    } finally {
+
+      setLoading(false);
+
+    }
+
+  };
+
+
 
   const handleDelete = async (id: number) => {
-    if (!confirm('¿Estás seguro de borrar esta subcategoría?')) return;
+
+    if (!confirm('¿Seguro que quieres borrar esta subcategoría? Los productos que la usen podrían quedar sin clasificación.')) return;
+
     try {
+
       const { error } = await supabase.from('subcategories').delete().eq('id', id);
+
       if (error) throw error;
-      setSubcategories(subcategories.filter(s => s.id !== id));
-      toast.success('Subcategoría eliminada');
-    } catch (err: any) { toast.error(err.message); }
-  };
 
-  // 🔥 Función para manejar el final del arrastre (Drop)
-  const onDragEnd = async (result: DropResult) => {
-    if (!result.destination) return;
+      setSubcategories((prev: any[]) => prev.filter(s => s.id !== id));
 
-    const sourceIndex = result.source.index;
-    const destinationIndex = result.destination.index;
-    const categoryIdStr = result.source.droppableId; 
-    
-    // Convertimos el categoryId a número si es necesario, o lo mantenemos como string
-    const categoryId = isNaN(Number(categoryIdStr)) ? categoryIdStr : Number(categoryIdStr);
+      toast.success('Subcategoría eliminada 🗑️');
 
-    if (sourceIndex === destinationIndex) return;
+    } catch (err: any) {
 
-    // Filtramos las subcategorías que pertenecen a esta categoría y las ordenamos por sort_order (o id si no hay sort_order)
-    let categorySubs = subcategories
-      .filter(sub => sub.category_id == categoryId)
-      .sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+      toast.error(err.message);
 
-    // Reordenamos localmente
-    const [reorderedItem] = categorySubs.splice(sourceIndex, 1);
-    categorySubs.splice(destinationIndex, 0, reorderedItem);
-
-    // Actualizamos el estado general (solo la parte visual primero para que sea rápido)
-    const updatedSubcategories = subcategories.map(sub => {
-      if (sub.category_id == categoryId) {
-         const newIndex = categorySubs.findIndex(s => s.id === sub.id);
-         return { ...sub, sort_order: newIndex };
-      }
-      return sub;
-    });
-    setSubcategories(updatedSubcategories);
-
-    // Guardamos el nuevo orden en Supabase
-    try {
-      // Preparamos las actualizaciones masivas
-      const updates = categorySubs.map((sub, index) => ({
-        id: sub.id,
-        sort_order: index,
-        // Incluimos los campos requeridos por Supabase si tu tabla no permite nulls en updates
-        name: sub.name,
-        slug: sub.slug,
-        category_id: sub.category_id
-      }));
-
-      const { error } = await supabase.from('subcategories').upsert(updates);
-      if (error) throw error;
-      
-    } catch (error: any) {
-      toast.error("Error al guardar el nuevo orden: " + error.message);
     }
+
   };
+
+
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 animate-in fade-in duration-500">
-      
-      {/* FORMULARIO SIMPLIFICADO */}
-      <div className="lg:col-span-1">
-        <div className="bg-white dark:bg-[#111] p-6 rounded-[2.5rem] border border-zinc-200 dark:border-zinc-800 shadow-sm sticky top-24">
-          <h2 className="text-xl font-bold text-zinc-900 dark:text-white mb-6 flex items-center gap-2">
-            {editingSubcategory ? '📝 Editar Subcategoría' : '✨ Nueva Subcategoría'}
-          </h2>
-          
-          <form onSubmit={editingSubcategory ? handleUpdate : handleCreate} className="space-y-4">
-            <div>
-              <label className="text-[10px] font-bold uppercase text-zinc-400 mb-1 block px-1">Categoría Padre</label>
-              <select 
-                required 
-                value={editingSubcategory ? editingSubcategory.category_id : newSubcategory.category_id}
-                onChange={e => editingSubcategory ? setEditingSubcategory({...editingSubcategory, category_id: e.target.value}) : setNewSubcategory({...newSubcategory, category_id: e.target.value})}
-                className="w-full p-3 bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl outline-none focus:border-indigo-500 text-sm appearance-none"
-              >
-                <option value="">Selecciona una categoría...</option>
-                {categories.map(cat => (
-                  <option key={cat.id} value={cat.id}>{cat.name}</option>
-                ))}
-              </select>
-            </div>
 
-            <div>
-              <label className="text-[10px] font-bold uppercase text-zinc-400 mb-1 block px-1">Nombre</label>
-              <input type="text" required value={editingSubcategory ? editingSubcategory.name : newSubcategory.name} onChange={e => editingSubcategory ? setEditingSubcategory({...editingSubcategory, name: e.target.value}) : setNewSubcategory({...newSubcategory, name: e.target.value})} className="w-full p-3 bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl outline-none focus:border-indigo-500 text-sm" />
-            </div>
-            
-            <div>
-              <label className="text-[10px] font-bold uppercase text-zinc-400 mb-1 block px-1">Slug (URL)</label>
-              <input type="text" required value={editingSubcategory ? editingSubcategory.slug : newSubcategory.slug} onChange={e => editingSubcategory ? setEditingSubcategory({...editingSubcategory, slug: e.target.value}) : setNewSubcategory({...newSubcategory, slug: e.target.value})} placeholder="ej: llaveros-personalizados" className="w-full p-3 bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl outline-none focus:border-indigo-500 text-sm" />
-            </div>
+    <div className="animate-in fade-in duration-300">
 
-            <div className="pt-2 flex gap-2">
-              <button type="submit" disabled={loading} className="flex-grow bg-indigo-600 text-white p-3 rounded-xl font-bold text-sm shadow-lg shadow-indigo-500/20 hover:bg-indigo-700 disabled:opacity-50 transition-all">
-                {loading ? 'Procesando...' : editingSubcategory ? 'Guardar Cambios' : 'Crear Subcategoría'}
-              </button>
-              {editingSubcategory && (
-                <button type="button" onClick={() => setEditingSubcategory(null)} className="bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 p-3 rounded-xl font-bold text-sm hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-all">
-                  Cancelar
-                </button>
-              )}
-            </div>
-          </form>
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
+
+        <div>
+
+          <h2 className="text-xl font-bold text-zinc-900 dark:text-white">Gestión de Subcategorías</h2>
+
+          <p className="text-sm text-zinc-500 mt-1">Organiza los estilos y tipos de productos dentro de tus categorías principales.</p>
+
         </div>
+
+        <button onClick={openNewModal} className="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2.5 rounded-xl font-bold shadow-md transition-all flex items-center gap-2 text-sm">
+
+          <span>📁</span> Nueva Subcategoría
+
+        </button>
+
       </div>
 
-      {/* LISTADO DE SUBCATEGORÍAS CON DRAG AND DROP */}
-      <div className="lg:col-span-2 space-y-6">
-        <h2 className="text-xl font-bold text-zinc-900 dark:text-white px-2">Subcategorías Existentes</h2>
-        
-        {/* Contexto de arrastre general */}
-        <DragDropContext onDragEnd={onDragEnd}>
-          {categories.map((category) => {
-            // Filtramos y ordenamos por sort_order
-            const categorySubs = subcategories
-              .filter(sub => sub.category_id == category.id)
-              .sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
-            
-            if (categorySubs.length === 0) return null;
 
-            return (
-              <div key={category.id} className="bg-white dark:bg-[#111] rounded-[2rem] border border-zinc-200 dark:border-zinc-800 p-6 shadow-sm">
-                <h3 className="text-lg font-black text-zinc-900 dark:text-white flex items-center gap-2 mb-4 pb-4 border-b border-zinc-100 dark:border-zinc-800/80">
-                  <span className="text-xl">{category.icon_emoji || '📁'}</span>
-                  {category.name}
-                  <span className="ml-auto text-xs font-normal text-zinc-400 bg-zinc-100 dark:bg-zinc-800 px-2 py-1 rounded-md">Arrastra para ordenar</span>
-                </h3>
-                
-                {/* Zona donde se pueden soltar los elementos */}
-                <Droppable droppableId={String(category.id)}>
-                  {(provided) => (
-                    <ul 
-                      {...provided.droppableProps} 
-                      ref={provided.innerRef}
-                      className="space-y-3"
-                    >
-                      {categorySubs.map((subcat, index) => (
-                        <Draggable key={String(subcat.id)} draggableId={String(subcat.id)} index={index}>
-                          {(provided, snapshot) => (
-                            <li 
-                              ref={provided.innerRef}
-                              {...provided.draggableProps}
-                              className={`flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 rounded-2xl border transition-all ${
-                                snapshot.isDragging 
-                                  ? 'bg-white dark:bg-zinc-800 border-indigo-500 shadow-xl scale-[1.02] z-50' 
-                                  : 'bg-zinc-50 dark:bg-zinc-900/50 border-zinc-100 dark:border-zinc-800/80 hover:border-indigo-200 dark:hover:border-indigo-500/30'
-                              }`}
-                            >
-                              <div className="flex items-center gap-4">
-                                {/* Manija para arrastrar */}
-                                <div {...provided.dragHandleProps} className="text-zinc-400 hover:text-indigo-500 cursor-grab active:cursor-grabbing p-1">
-                                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 8h16M4 16h16"/></svg>
-                                </div>
-                                <div>
-                                  <p className="font-bold text-sm text-zinc-900 dark:text-white">{subcat.name}</p>
-                                  <p className="text-xs font-mono text-zinc-500 mt-0.5">/{subcat.slug}</p>
-                                </div>
-                              </div>
-                              
-                              <div className="flex gap-2">
-                                <button onClick={() => setEditingSubcategory(subcat)} className="px-4 py-2 bg-white dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 rounded-xl text-xs font-bold border border-zinc-200 dark:border-zinc-700 shadow-sm hover:text-indigo-600 transition-colors">
-                                  Editar
-                                </button>
-                                <button onClick={() => handleDelete(subcat.id)} className="px-4 py-2 bg-white dark:bg-zinc-800 text-red-600 dark:text-red-400 rounded-xl text-xs font-bold border border-zinc-200 dark:border-zinc-700 shadow-sm hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors">
-                                  Borrar
-                                </button>
-                              </div>
-                            </li>
-                          )}
-                        </Draggable>
-                      ))}
-                      {provided.placeholder}
-                    </ul>
-                  )}
-                </Droppable>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+
+        {categories.map(cat => (
+
+          <div key={cat.id} className="space-y-4">
+
+            <h3 className="text-xs font-black uppercase tracking-[0.2em] text-indigo-500 flex items-center gap-2">
+
+              <span className="w-2 h-2 rounded-full bg-indigo-500"></span>
+
+              {cat.name}
+
+            </h3>
+
+           
+
+            <div className="bg-white dark:bg-[#111] border border-zinc-200 dark:border-zinc-800 rounded-2xl overflow-hidden shadow-sm">
+
+              <div className="divide-y divide-zinc-100 dark:divide-zinc-800/50">
+
+                {subcategories.filter(s => s.category_id === cat.id).length === 0 ? (
+
+                  <p className="p-4 text-xs text-zinc-400 italic text-center">Sin subcategorías</p>
+
+                ) : (
+
+                  subcategories.filter(s => s.category_id === cat.id).map(sub => (
+
+                    <div key={sub.id} className="p-3 flex justify-between items-center group hover:bg-zinc-50 dark:hover:bg-zinc-800/30 transition-colors">
+
+                      <div className="flex items-center gap-3">
+
+                        <span className="text-xl bg-zinc-100 dark:bg-zinc-800 w-8 h-8 rounded-lg flex items-center justify-center">{sub.icon || '✨'}</span>
+
+                        <div>
+
+                          <span className="text-sm font-semibold text-zinc-700 dark:text-zinc-300 block leading-tight">{sub.name}</span>
+
+                          <span className="text-[10px] text-zinc-400 font-bold uppercase tracking-wider">Orden: {sub.sort_order || 0}</span>
+
+                        </div>
+
+                      </div>
+
+                      <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+
+                        <button onClick={() => openEditModal(sub)} className="p-1.5 text-zinc-400 hover:text-indigo-500 transition-colors">
+
+                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
+
+                        </button>
+
+                        <button onClick={() => handleDelete(sub.id)} className="p-1.5 text-zinc-400 hover:text-red-500 transition-colors">
+
+                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+
+                        </button>
+
+                      </div>
+
+                    </div>
+
+                  ))
+
+                )}
+
               </div>
-            );
-          })}
-        </DragDropContext>
 
-        {subcategories.length === 0 && (
-          <div className="text-center py-12 bg-white dark:bg-[#111] rounded-[2rem] border border-zinc-200 dark:border-zinc-800">
-            <span className="text-4xl mb-4 block">📭</span>
-            <p className="text-zinc-500 font-medium">Aún no hay subcategorías creadas.</p>
+            </div>
+
           </div>
-        )}
+
+        ))}
+
       </div>
+
+
+
+      {isModalOpen && (
+
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in">
+
+          <div className="bg-white dark:bg-[#111] border border-zinc-200 dark:border-zinc-800 rounded-3xl shadow-2xl max-w-sm w-full overflow-hidden flex flex-col relative animate-in zoom-in-95">
+
+            <div className="p-6 border-b border-zinc-100 dark:border-zinc-800/80 flex justify-between items-center">
+
+              <h2 className="text-xl font-bold">{editingSub ? 'Editar' : 'Nueva'} Subcategoría</h2>
+
+              <button onClick={() => setIsModalOpen(false)} className="text-zinc-400 hover:text-zinc-600">
+
+                <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+
+              </button>
+
+            </div>
+
+            <form onSubmit={handleSubmit} className="p-6 space-y-4">
+
+              <div>
+
+                <label className="text-[10px] font-bold uppercase text-zinc-400 mb-1 block px-1">Categoría Padre</label>
+
+                <select value={categoryId} onChange={e => setCategoryId(e.target.value)} className="w-full p-3 bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl outline-none focus:border-indigo-500 text-sm" required>
+
+                  <option value="">Seleccionar...</option>
+
+                  {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+
+                </select>
+
+              </div>
+
+              <div>
+
+                <label className="text-[10px] font-bold uppercase text-zinc-400 mb-1 block px-1">Nombre</label>
+
+                <input type="text" value={name} onChange={e => setName(e.target.value)} placeholder="Ej: Personajes Anime" className="w-full p-3 bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl outline-none focus:border-indigo-500 text-sm" required />
+
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+
+                <div>
+
+                  <label className="text-[10px] font-bold uppercase text-zinc-400 mb-1 block px-1">Icono (Emoji)</label>
+
+                  <input type="text" value={icon} onChange={e => setIcon(e.target.value)} placeholder="✨" className="w-full p-3 bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl outline-none focus:border-indigo-500 text-sm text-center text-xl" required />
+
+                </div>
+
+                <div>
+
+                  <label className="text-[10px] font-bold uppercase text-zinc-400 mb-1 block px-1">Orden (0 es primero)</label>
+
+                  <input type="number" value={sortOrder} onChange={e => setSortOrder(e.target.value)} className="w-full p-3 bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl outline-none focus:border-indigo-500 text-sm text-center" required />
+
+                </div>
+
+              </div>
+
+              <button type="submit" disabled={loading} className="w-full bg-indigo-600 text-white p-3.5 rounded-xl font-bold text-sm shadow-lg shadow-indigo-500/20 hover:bg-indigo-700 disabled:opacity-50 transition-all mt-2">
+
+                {loading ? 'Guardando...' : 'Guardar Subcategoría'}
+
+              </button>
+
+            </form>
+
+          </div>
+
+        </div>
+
+      )}
+
     </div>
+
   );
+
 }
