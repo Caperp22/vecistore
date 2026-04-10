@@ -60,7 +60,7 @@ export default function SubcategoriesTab({ categories, subcategories, setSubcate
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 animate-in fade-in duration-500">
       
-      {/* FORMULARIO SIMPLIFICADO */}
+      {/* FORMULARIO */}
       <div className="lg:col-span-1">
         <div className="bg-white dark:bg-[#111] p-6 rounded-[2.5rem] border border-zinc-200 dark:border-zinc-800 shadow-sm sticky top-24">
           <h2 className="text-xl font-bold text-zinc-900 dark:text-white mb-6 flex items-center gap-2">
@@ -68,8 +68,6 @@ export default function SubcategoriesTab({ categories, subcategories, setSubcate
           </h2>
           
           <form onSubmit={editingSubcategory ? handleUpdate : handleCreate} className="space-y-4">
-            
-            {/* SELECCIÓN DE CATEGORÍA PADRE */}
             <div>
               <label className="text-[10px] font-bold uppercase text-zinc-400 mb-1 block px-1">Categoría Padre</label>
               <select 
@@ -109,35 +107,60 @@ export default function SubcategoriesTab({ categories, subcategories, setSubcate
         </div>
       </div>
 
-      {/* LISTADO DE SUBCATEGORÍAS LIMPIO */}
-      <div className="lg:col-span-2 space-y-4">
-        <h2 className="text-xl font-bold text-zinc-900 dark:text-white px-2">Subcategorías Existentes</h2>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          {subcategories.map((subcat) => {
-            const parentCat = categories.find(c => c.id === subcat.category_id);
-            
-            return (
-              <div key={subcat.id} className="bg-white dark:bg-[#111] rounded-[1.5rem] border border-zinc-200 dark:border-zinc-800 p-5 shadow-sm flex flex-col group hover:shadow-md hover:border-indigo-500/50 transition-all">
-                <div className="flex justify-between items-start mb-6">
-                  <div>
-                    <h3 className="font-bold text-lg text-zinc-900 dark:text-white leading-tight">{subcat.name}</h3>
-                    <p className="text-xs font-mono text-zinc-500 mt-1">/{subcat.slug}</p>
-                  </div>
-                  {parentCat && (
-                    <span className="bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 text-[10px] font-bold px-2 py-1 rounded-md border border-indigo-100 dark:border-indigo-500/20 text-right max-w-[100px] truncate">
-                      {parentCat.name}
-                    </span>
-                  )}
-                </div>
-                
-                <div className="flex gap-2 mt-auto pt-2 border-t border-zinc-100 dark:border-zinc-800/80">
-                  <button onClick={() => setEditingSubcategory(subcat)} className="flex-1 py-2 bg-zinc-50 dark:bg-zinc-800/50 text-zinc-700 dark:text-zinc-300 rounded-xl text-xs font-bold border border-zinc-200 dark:border-zinc-700/50 hover:bg-indigo-50 dark:hover:bg-indigo-500/20 hover:text-indigo-600 transition-colors">Editar</button>
-                  <button onClick={() => handleDelete(subcat.id)} className="px-4 py-2 bg-red-50 dark:bg-red-500/10 text-red-600 dark:text-red-400 rounded-xl text-xs font-bold border border-red-100 dark:border-red-900/20 hover:bg-red-100 transition-colors">Borrar</button>
-                </div>
-              </div>
-            );
-          })}
+      {/* LISTADO DE SUBCATEGORÍAS (AGRUPADAS EN LISTAS BONITAS) */}
+      <div className="lg:col-span-2 space-y-6">
+        <div className="flex items-center justify-between px-2 mb-2">
+          <h2 className="text-xl font-bold text-zinc-900 dark:text-white">Subcategorías Existentes</h2>
+          <span className="text-sm font-medium text-zinc-500 bg-zinc-100 dark:bg-zinc-800 px-3 py-1 rounded-full">{subcategories.length} en total</span>
         </div>
+        
+        {categories.map((category) => {
+          // Filtramos las subcategorías que pertenecen a esta categoría
+          const categorySubs = subcategories.filter(sub => sub.category_id === category.id);
+          
+          if (categorySubs.length === 0) return null; // Si no tiene subcategorías, no la mostramos
+
+          return (
+            <div key={category.id} className="bg-white dark:bg-[#111] rounded-[2rem] border border-zinc-200 dark:border-zinc-800 p-6 shadow-sm">
+              <h3 className="text-lg font-black text-zinc-900 dark:text-white flex items-center gap-2 mb-4 pb-4 border-b border-zinc-100 dark:border-zinc-800/80">
+                <span className="text-xl">{category.icon_emoji || '📁'}</span>
+                {category.name}
+              </h3>
+              
+              <ul className="space-y-3">
+                {categorySubs.map((subcat) => (
+                  <li key={subcat.id} className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 bg-zinc-50 dark:bg-zinc-900/50 rounded-2xl border border-zinc-100 dark:border-zinc-800/80 hover:border-indigo-200 dark:hover:border-indigo-500/30 transition-colors group">
+                    <div>
+                      <p className="font-bold text-sm text-zinc-900 dark:text-white">{subcat.name}</p>
+                      <p className="text-xs font-mono text-zinc-500 mt-0.5">/{subcat.slug}</p>
+                    </div>
+                    <div className="flex gap-2">
+                      <button 
+                        onClick={() => setEditingSubcategory(subcat)} 
+                        className="px-4 py-2 bg-white dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 rounded-xl text-xs font-bold border border-zinc-200 dark:border-zinc-700 shadow-sm hover:text-indigo-600 transition-colors"
+                      >
+                        Editar
+                      </button>
+                      <button 
+                        onClick={() => handleDelete(subcat.id)} 
+                        className="px-4 py-2 bg-white dark:bg-zinc-800 text-red-600 dark:text-red-400 rounded-xl text-xs font-bold border border-zinc-200 dark:border-zinc-700 shadow-sm hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+                      >
+                        Borrar
+                      </button>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          );
+        })}
+
+        {subcategories.length === 0 && (
+          <div className="text-center py-12 bg-white dark:bg-[#111] rounded-[2rem] border border-zinc-200 dark:border-zinc-800">
+            <span className="text-4xl mb-4 block">📭</span>
+            <p className="text-zinc-500 font-medium">Aún no hay subcategorías creadas.</p>
+          </div>
+        )}
       </div>
     </div>
   );
